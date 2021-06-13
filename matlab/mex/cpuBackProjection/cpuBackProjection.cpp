@@ -143,8 +143,8 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     Npulses = mxGetN(prhs[0]);
     Nrangebins = mxGetM(prhs[0]);
 
-    range_profiles = mxGetComplexSingles(prhs[0]);  
-    
+    range_profiles = mxGetComplexSingles(prhs[0]);
+
     //range_profiles.real = (float*) mxGetPr(prhs[0]);
     //range_profiles.imag = (float*) mxGetPi(prhs[0]);
 
@@ -373,9 +373,10 @@ void run_bp(mxComplexSingle* phd, float* xObs, float* yObs, float* zObs, float* 
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
         CArray phaseData(phd, Nfft);
         ifft(phaseData);
-        for (int i=0; i < 5; i++) {
-            std::cout << phaseData[i] << std::endl;
-        }
+        CArray fftshift(Nfft);
+        fftshift[std::slice(0, Nfft / 2, 1)] = phaseData[std::slice(Nfft / 2 + 1, Nfft, 1)];
+        fftshift[std::slice(Nfft/2 + 1, Nfft, 1)] = phaseData[std::slice(0, Nfft/2, 1)];
+        std::cout << fftshift[0] << std::endl;
     }
 }
 
@@ -397,7 +398,7 @@ void fft(CArray& x) {
 
     // combine
     for (size_t k = 0; k < N / 2; ++k) {
-        Complex t = Complex::polar(1.0f, -2.0f* PI * k / N) * odd[k];
+        Complex t = Complex::polar(1.0f, -2.0f * PI * k / N) * odd[k];
         x[k ] = even[k] + t;
         x[k + N / 2] = even[k] - t;
     }
@@ -459,8 +460,8 @@ void ifft(CArray& x) {
 
     // conjugate the complex numbers again
     x = x.apply(mxComplexSingleClass::conj);
-    
+
 
     // scale the numbers
-    x /= x.size();    
+    x /= x.size();
 }

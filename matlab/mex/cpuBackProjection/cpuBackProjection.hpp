@@ -211,7 +211,7 @@ operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
 // std::cout << "Enter a complex number (a+bi) : " << std::endl;
 // std::cin >> x;
 
-std::istream& operator>>(std::istream& input, mxComplexSingleClass& __x) {
+inline std::istream& operator>>(std::istream& input, mxComplexSingleClass& __x) {
     char plus;
     char i;
     input >> __x.real >> plus >> __x.imag >> i;
@@ -219,7 +219,7 @@ std::istream& operator>>(std::istream& input, mxComplexSingleClass& __x) {
 }
 ///  Insertion operator for complex values.
 
-std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass& __x) {
+inline std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass& __x) {
     output << __x.real << ((__x.imag <= 0) ? "" : "+") << __x.imag << "i";
     return output;
 }

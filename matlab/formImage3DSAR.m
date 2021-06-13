@@ -20,7 +20,7 @@ clear all; close all; clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % INPUT PARAMETERS START HERE %
-addPath = '../build/bin'
+addpath('../build/bin');
 % Define the path to the base directory of the dataset
 dvdPath = '../../../sar/GOTCHA/Gotcha-CP-All';
 
