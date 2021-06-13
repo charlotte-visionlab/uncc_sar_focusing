@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="100">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <df root="." name="0">
+      <df name="build">
+        <df name="bin">
+        </df>
+        <df name="CMakeFiles">
+          <df name="3.10.2">
+            <df name="CompilerIdCUDA">
+              <df name="tmp">
+                <in>CMakeCUDACompilerId.cudafe1.c</in>
+                <in>CMakeCUDACompilerId.cudafe1.cpp</in>
+                <in>CMakeCUDACompilerId.cudafe1.stub.c</in>
+                <in>CMakeCUDACompilerId.fatbin.c</in>
+                <in>a_dlink.fatbin.c</in>
+                <in>a_dlink.reg.c</in>
+              </df>
+              <in>CMakeCUDACompilerId.cu</in>
+            </df>
+            <df name="CompilerIdCXX">
+              <df name="tmp">
+              </df>
+              <in>CMakeCXXCompilerId.cpp</in>
+            </df>
+          </df>
+          <df name="CheckLibraryExists">
+            <in>CheckFunctionExists.cxx</in>
+          </df>
+          <df name="CMakeTmp">
+          </df>
+          <in>feature_tests.cxx</in>
+        </df>
+        <df name="matlab">
+          <df name="mex">
+            <df name="CMakeFiles">
+            </df>
+            <df name="cpuBackProjection">
+              <df name="CMakeFiles">
+                <df name="cpuBackProjection.dir">
+                </df>
+              </df>
+            </df>
+            <df name="mexcuda">
+              <df name="CMakeFiles">
+              </df>
+              <df name="cudaAdd">
+                <df name="CMakeFiles">
+                  <df name="cuda_compile_1.dir">
+                  </df>
+                  <df name="cudaAdd.dir">
+                  </df>
+                </df>
+              </df>
+              <df name="cudaBackProjection">
+                <df name="CMakeFiles">
+                  <df name="cuda_compile_1.dir">
+                  </df>
+                  <df name="cudaBackProjection.dir">
+                  </df>
+                </df>
+              </df>
+            </df>
+          </df>
+        </df>
+        <df name="Matlab">
+        </df>
+      </df>
+      <df name="docs">
+      </df>
+      <df name="matlab">
+        <df name="mex">
+          <df name="cmake">
+          </df>
+          <df name="cpuBackProjection">
+            <in>cpuBackProjection.cpp</in>
+            <in>cpuBackProjection.hpp</in>
+          </df>
+          <df name="mexcuda">
+            <df name="cudaAdd">
+              <in>cudaAdd.cu</in>
+              <in>gpuAddKernel.cuh</in>
+            </df>
+            <df name="cudaBackProjection">
+              <in>cudaBackProjection.cu</in>
+              <in>gpuBackProjectionKernel.cuh</in>
+            </df>
+          </df>
+          <in>Matlabdef.def</in>
+        </df>
+        <in>bpBasic.m</in>
+        <in>bpBasicFarField.m</in>
+        <in>formImage3DSAR.m</in>
+        <in>formImageBackhoe.m</in>
+        <in>formImageCVDomes.m</in>
+        <in>formImageMTI.m</in>
+        <in>formImagePointTargetBP.m</in>
+        <in>formImagePointTargetMF.m</in>
+        <in>generateData3DSAR.m</in>
+        <in>generateDataMTI.m</in>
+        <in>green14.m</in>
+        <in>helper3DSAR.m</in>
+        <in>helperMTI.m</in>
+        <in>mfBasic.m</in>
+        <in>rangeCompress.m</in>
+      </df>
+      <df name="python">
+        <in>PyCUDABackProjectionKernel.cu</in>
+        <in>PyCUDABackProjectionKernel.h</in>
+        <in>PyCUDABackProjectionKernelDebug.cu</in>
+      </df>
+    </df>
+  </logicalFolder>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <developmentServer>localhost</developmentServer>
+        <platform>2</platform>
+      </toolsSet>
+      <compile>
+        <compiledirpicklist>
+          <compiledirpicklistitem>.</compiledirpicklistitem>
+          <compiledirpicklistitem>${AUTO_FOLDER}</compiledirpicklistitem>
+        </compiledirpicklist>
+        <compiledir>${AUTO_FOLDER}</compiledir>
+        <compilecommandpicklist>
+          <compilecommandpicklistitem>${MAKE} ${ITEM_NAME}.o</compilecommandpicklistitem>
+          <compilecommandpicklistitem>${AUTO_COMPILE}</compilecommandpicklistitem>
+        </compilecommandpicklist>
+        <compilecommand>${AUTO_COMPILE}</compilecommand>
+      </compile>
+      <dbx_gdbdebugger version="1">
+        <gdb_pathmaps>
+        </gdb_pathmaps>
+        <gdb_interceptlist>
+          <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
+        </gdb_interceptlist>
+        <gdb_options>
+          <DebugOptions>
+          </DebugOptions>
+        </gdb_options>
+        <gdb_buildfirst gdb_buildfirst_overriden="false" gdb_buildfirst_old="false"/>
+      </dbx_gdbdebugger>
+      <nativedebugger version="1">
+        <engine>gdb</engine>
+      </nativedebugger>
+      <runprofile version="9">
+        <runcommandpicklist>
+          <runcommandpicklistitem>"${OUTPUT_PATH}"</runcommandpicklistitem>
+        </runcommandpicklist>
+        <runcommand>"${OUTPUT_PATH}"</runcommand>
+        <rundir>.</rundir>
+        <buildfirst>false</buildfirst>
+        <terminal-type>0</terminal-type>
+        <remove-instrumentation>0</remove-instrumentation>
+        <environment>
+        </environment>
+      </runprofile>
+    </conf>
+  </confs>
+</configurationDescriptor>

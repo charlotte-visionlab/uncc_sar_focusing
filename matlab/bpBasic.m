@@ -86,7 +86,7 @@ for ii = 1:data.Np
         (data.AntZ(ii)-data.z_mat).^2) - data.R0(ii);
 
     % Calculate phase correction for image
-    phCorr = exp(1i*4*pi*data.minF(ii)/c*dR);
+    phCorr = exp(1i*4*pi*data.minF(ii)*dR/c);
 
     % Determine which pixels fall within the range swath
     I = find(and(dR > min(data.r_vec), dR < max(data.r_vec)));

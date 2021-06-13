@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="100">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="crt"
+                   displayName="crt"
+                   projectFiles="true"
+                   root="/usr/local/cuda/bin/crt">
+      <itemPath>/usr/local/cuda/bin/crt/link.stub</itemPath>
+    </logicalFolder>
+    <logicalFolder name="Modules"
+                   displayName="Modules"
+                   projectFiles="true"
+                   root="/usr/share/cmake-3.10/Modules">
+      <itemPath>/usr/share/cmake-3.10/Modules/CMakeCUDACompilerABI.cu</itemPath>
+      <itemPath>/usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp</itemPath>
+      <itemPath>/usr/share/cmake-3.10/Modules/CMakeCompilerABI.h</itemPath>
+    </logicalFolder>
+    <df root="." name="0">
+      <df name="matlab">
+        <df name="mex">
+          <df name="cpuBackProjection">
+            <in>cpuBackProjection.cpp</in>
+          </df>
+          <df name="mexcuda">
+            <df name="cudaAdd">
+              <in>cudaAdd.cu</in>
+            </df>
+            <df name="cudaBackProjection">
+              <in>cudaBackProjection.cu</in>
+            </df>
+          </df>
+        </df>
+      </df>
+    </df>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>CMakeLists.txt</itemPath>
+      <itemPath>Makefile</itemPath>
+      <itemPath>nbproject/private/launcher.properties</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceFolderFilter>^(nbproject)$</sourceFolderFilter>
+  <sourceRootList>
+    <Elem>.</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Default" type="0">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>false</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <flagsDictionary>
+        <element flagsID="0" commonFlags="-fPIC -fPIC"/>
+        <element flagsID="1"
+                 commonFlags="-m64 -mtune=generic -march=x86-64 -fPIC -fstack-protector-strong"/>
+        <element flagsID="2" commonFlags="-std=c++14"/>
+        <element flagsID="3" commonFlags="-xc++ -fPIC -fPIC -m64"/>
+        <element flagsID="4" commonFlags="-xc++ -m64"/>
+      </flagsDictionary>
+      <codeAssistance>
+      </codeAssistance>
+      <makefileType>
+        <makeTool>
+          <buildCommandWorkingDir>build</buildCommandWorkingDir>
+          <buildCommand>${MAKE} -f Makefile</buildCommand>
+          <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
+          <executablePath></executablePath>
+        </makeTool>
+        <preBuild>
+          <preBuildCommandWorkingDir>build</preBuildCommandWorkingDir>
+          <preBuildCommand>${CMAKE} -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER=${IDE_CC} -DCMAKE_CXX_COMPILER=${IDE_CXX} -DCMAKE_C_FLAGS_DEBUG="-g3 -gdwarf-2" -DCMAKE_CXX_FLAGS_DEBUG="-g3 -gdwarf-2" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..</preBuildCommand>
+        </preBuild>
+      </makefileType>
+      <item path="/usr/local/cuda/bin/crt/link.stub" ex="false" tool="1" flavor2="11">
+        <ccTool flags="1">
+        </ccTool>
+      </item>
+      <item path="/usr/share/cmake-3.10/Modules/CMakeCUDACompilerABI.cu"
+            ex="false"
+            tool="1"
+            flavor2="11">
+        <ccTool flags="4">
+          <incDir>
+            <pElem>/usr/local/cuda/targets/x86_64-linux/include</pElem>
+            <pElem>build/CMakeFiles/CMakeTmp</pElem>
+          </incDir>
+          <incFile>
+            <pElem>/usr/local/cuda/targets/x86_64-linux/include/cuda_runtime.h</pElem>
+          </incFile>
+          <preprocessorList>
+            <Elem>CUDA_DOUBLE_MATH_FUNCTIONS</Elem>
+            <Elem>__CUDACC_VER_BUILD__=221</Elem>
+            <Elem>__CUDACC_VER_MAJOR__=11</Elem>
+            <Elem>__CUDACC_VER_MINOR__=0</Elem>
+            <Elem>__CUDACC__</Elem>
+            <Elem>__CUDA_ARCH__=520</Elem>
+            <Elem>__NVCC__</Elem>
+          </preprocessorList>
+        </ccTool>
+      </item>
+      <item path="/usr/share/cmake-3.10/Modules/CMakeCXXCompilerABI.cpp"
+            ex="false"
+            tool="1"
+            flavor2="11">
+        <ccTool flags="2">
+          <incDir>
+            <pElem>build/CMakeFiles/CMakeTmp</pElem>
+          </incDir>
+        </ccTool>
+      </item>
+      <folder path="0">
+        <ccTool>
+          <incDir>
+            <pElem>/usr/local/cuda/include</pElem>
+          </incDir>
+          <incFile>
+            <pElem>/usr/local/cuda/include/cuda_runtime.h</pElem>
+          </incFile>
+          <preprocessorList>
+            <Elem>MATLAB_DEFAULT_RELEASE=R2020a</Elem>
+            <Elem>MATLAB_MEX_FILE</Elem>
+            <Elem>MX_COMPAT_64</Elem>
+            <Elem>USE_MEX_CMD</Elem>
+          </preprocessorList>
+        </ccTool>
+      </folder>
+      <folder path="0/matlab/mex/cpuBackProjection">
+        <ccTool>
+          <incDir>
+            <pElem>/usr/local/bin/matlab/R2021a/extern/include</pElem>
+            <pElem>build/matlab/mex/cpuBackProjection</pElem>
+          </incDir>
+          <preprocessorList>
+            <Elem>cpuBackProjection_EXPORTS</Elem>
+          </preprocessorList>
+        </ccTool>
+      </folder>
+      <folder path="0/matlab/mex/mexcuda">
+        <ccTool>
+          <preprocessorList>
+            <Elem>CUDA_DOUBLE_MATH_FUNCTIONS</Elem>
+            <Elem>NVCC</Elem>
+            <Elem>__CUDACC_DEBUG__</Elem>
+            <Elem>__CUDACC_VER_BUILD__=221</Elem>
+            <Elem>__CUDACC_VER_MAJOR__=11</Elem>
+            <Elem>__CUDACC_VER_MINOR__=0</Elem>
+            <Elem>__CUDACC__</Elem>
+            <Elem>__CUDA_ARCH__=350</Elem>
+            <Elem>__NVCC__</Elem>
+            <Elem>cuda_compile_1_EXPORTS</Elem>
+          </preprocessorList>
+        </ccTool>
+      </folder>
+      <folder path="0/matlab/mex/mexcuda/cudaAdd">
+        <ccTool>
+          <incDir>
+            <pElem>/usr/local/bin/matlab/R2021a/extern/include</pElem>
+            <pElem>/usr/local/cuda/targets/x86_64-linux/include</pElem>
+            <pElem>build/matlab/mex/mexcuda/cudaAdd/CMakeFiles/cuda_compile_1.dir</pElem>
+          </incDir>
+        </ccTool>
+      </folder>
+      <folder path="0/matlab/mex/mexcuda/cudaBackProjection">
+        <ccTool>
+          <incDir>
+            <pElem>/usr/local/cuda/samples/common/inc</pElem>
+            <pElem>/usr/local/bin/matlab/R2021a/extern/include</pElem>
+            <pElem>/usr/local/bin/matlab/R2021a/toolbox/parallel/gpu/extern/include</pElem>
+            <pElem>/usr/local/bin/matlab/R2021a/sys/cuda/glnxa64/cuda/include</pElem>
+            <pElem>/usr/local/cuda/targets/x86_64-linux/include</pElem>
+            <pElem>build/matlab/mex/mexcuda/cudaBackProjection/CMakeFiles/cuda_compile_1.dir</pElem>
+          </incDir>
+        </ccTool>
+      </folder>
+      <folder path="crt">
+        <ccTool>
+          <incDir>
+            <pElem>/usr/local/cuda/bin/crt</pElem>
+            <pElem>/usr/local/cuda/targets/x86_64-linux/include</pElem>
+            <pElem>/tmp</pElem>
+            <pElem>build/matlab/mex/cudamex/cudaAdd</pElem>
+          </incDir>
+        </ccTool>
+      </folder>
+      <item path="matlab/mex/cpuBackProjection/cpuBackProjection.cpp"
+            ex="false"
+            tool="1"
+            flavor2="11">
+        <ccTool flags="0">
+        </ccTool>
+      </item>
+      <item path="matlab/mex/mexcuda/cudaAdd/cudaAdd.cu"
+            ex="false"
+            tool="1"
+            flavor2="11">
+        <ccTool flags="3">
+        </ccTool>
+      </item>
+      <item path="matlab/mex/mexcuda/cudaBackProjection/cudaBackProjection.cu"
+            ex="false"
+            tool="1"
+            flavor2="11">
+        <ccTool flags="3">
+        </ccTool>
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>

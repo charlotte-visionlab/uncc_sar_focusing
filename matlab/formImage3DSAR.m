@@ -20,9 +20,9 @@ clear all; close all; clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % INPUT PARAMETERS START HERE %
-
+addPath = '../build/bin'
 % Define the path to the base directory of the dataset
-dvdPath = '/ssip1/GOTCHA/PublicReleaseDataset3DSAR/DVD';
+dvdPath = '../../../sar/GOTCHA/Gotcha-CP-All';
 
 % Define input data parameters here
 pass = 1;               % What pass to image (1-8)
@@ -35,7 +35,7 @@ taper_flag = 0;         % Add a hamming taper for sidelobe control
 % Define image parameters here
 data.Wx = 100;          % Scene extent x (m)
 data.Wy = 100;          % Scene extent y (m)
-data.Nfft = 4096;       % Number of samples in FFT
+data.Nfft = 424;       % Number of samples in FFT
 data.Nx = 501;          % Number of samples in x direction
 data.Ny = 501;          % Number of samples in y direction
 data.x0 = 0;            % Center of image scene in x direction (m)
@@ -45,7 +45,7 @@ dyn_range = 70;         % dB of dynamic range to display
 % INPUT PARAMETERS END HERE %
 
 % Determine data path
-datadir = sprintf('%s%sdata',dvdPath,filesep);
+datadir = sprintf('%s%sDATA',dvdPath,filesep);
 
 % Read in the data
 for ii = minaz:maxaz
@@ -55,7 +55,7 @@ for ii = minaz:maxaz
     
     % Load in the file
     newdata = load(in_fname);
-
+    
     % If this is the first data file, define new variables to store data.
     % Otherwise, append the data file to the existing variables
     if isfield(data,'phdata')
@@ -64,7 +64,7 @@ for ii = minaz:maxaz
         
         % Determine the number of pulses already added
         Ncur = size(data.phdata,2);
-
+        
         % Update the phase history
         data.phdata(:,(Ncur+1):(Ncur+Nin)) = newdata.data.fp;
         
@@ -119,9 +119,47 @@ data.y_vec = linspace(data.y0 - data.Wy/2, data.y0 + data.Wy/2, data.Ny);
 [data.x_mat,data.y_mat] = meshgrid(data.x_vec,data.y_vec);
 data.z_mat = zeros(size(data.x_mat));
 
-% Call the backprojection function with the appropriate inputs
-data = bpBasic(data);
-
+if (false)
+    % Call the backprojection function with the appropriate inputs
+    data = bpBasic(data);
+elseif (true)
+    data.z_vec = zeros(1,length(data.x_vec));
+    data.phdata = single(data.phdata);
+    data.minF = single(data.minF);
+    data.R0 = single(data.R0);
+    data.x_vec = single(data.x_vec);
+    data.y_vec = single(data.y_vec);
+    data.z_vec = single(data.z_vec);
+    data.AntX = single(data.AntX);
+    data.AntY = single(data.AntY);
+    data.AntZ = single(data.AntZ);
+    data.deltaF = single(data.deltaF);
+    bounds = single([data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.y0 - data.Wy/2, data.y0 + data.Wy/2]);
+    data.x_vec(1:10)
+    data.im_final = cpuBackProjection(data.phdata, data.minF, data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny,  ...
+        bounds(1), bounds(2), bounds(3), bounds(4));
+else
+    gpuDevice
+    % to compile
+    % mexcuda -v -I/usr/local/cuda-11.3/samples/common/inc CUDABackProjectionKernel.cu
+    data.z_vec = zeros(1,length(data.x_vec));
+    data.phdata = single(data.phdata);
+    data.minF = single(data.minF);
+    data.R0 = single(data.R0);
+    data.x_vec = single(data.x_vec);
+    data.y_vec = single(data.y_vec);
+    data.z_vec = single(data.z_vec);
+    data.AntX = single(data.AntX);
+    data.AntY = single(data.AntY);
+    data.AntZ = single(data.AntZ);
+    data.deltaF = single(data.deltaF);
+    for pulseIdx=1:size(data.phdata,2)
+        data.rc(:,pulseIdx) = fftshift(ifft(data.phdata(:,pulseIdx),data.Nfft));
+    end
+    bounds = single([data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.y0 - data.Wy/2, data.y0 + data.Wy/2]);
+    data.im_final = cudaBackProjection(data.phdata, data.minF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny, data.deltaF(1), ...
+        bounds(1), bounds(2), bounds(3), bounds(4));
+end
 % Display the image
 figure
 imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
@@ -130,9 +168,9 @@ colormap gray
 axis xy image;
 set(gca,'XTick',-50:25:50,'YTick',-50:25:50);
 h = xlabel('x (m)');
-set(h,'FontSize',14,'FontWeight','Bold');
+set(h,'FontSize',14,'FontWeight''Bold');
 h = ylabel('y (m)');
 set(h,'FontSize',14,'FontWeight','Bold');
 colorbar
 set(gca,'FontSize',14,'FontWeight','Bold');
-print -deps2 /ssip2/lgorham/SPIE10/fig/3DsarBPA.eps
+% print -deps2 /ssip2/lgorham/SPIE10/fig/3DsarBPA.eps
