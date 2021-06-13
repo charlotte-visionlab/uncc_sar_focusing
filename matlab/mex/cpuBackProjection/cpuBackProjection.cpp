@@ -8,11 +8,6 @@
 #include <valarray>
 #include <vector>
 
-//#include <mex.h>    // Matlab library includes
-//#include "matrix.h"
-
-//#include <fftw3.h>  // Fastest Fourier Transform in the West (FFTW) library
-
 #include "cpuBackProjection.hpp"
 
 #define PI2 6.2831853071800f   /* 2*pi */

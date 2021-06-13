@@ -1,6 +1,6 @@
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
-find_package(FFTW REQUIRED)
+#find_package(FFTW REQUIRED)
 
 # compile cuda mex for shader models 2.0 as default, support double
 set(CPP_FILE cpuBackProjection)
@@ -12,11 +12,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -DMATLAB_MEX_FILE -g -O0")
 
 include_directories(
     ${Matlab_INCLUDE_DIRS}
-    ${FFTW_INCLUDE_DIRS}
+    #${FFTW_INCLUDE_DIRS}
 )
 
 add_library(${CPP_FILE} SHARED ${${CPP_FILE}} ${CPP_FILE_NAME} ${MATLAB_PROJECT_DIR}/Matlabdef.def)
-target_link_libraries(${CPP_FILE} ${MATLAB_LIBRARIES} ${FFTW_LIBRARIES})
+target_link_libraries(${CPP_FILE} ${MATLAB_LIBRARIES})# ${FFTW_LIBRARIES})
 set_target_properties(${CPP_FILE} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
 
 # 32-bit or 64-bit mex

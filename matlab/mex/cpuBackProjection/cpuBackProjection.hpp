@@ -11,6 +11,7 @@
 #include <cmath>
 
 #include <mex.h>    // Matlab library includes
+#include <matrix.h> // Matlab mxComplexSingle struct
 
 class mxComplexSingleClass : public mxComplexSingle {
 public:
@@ -20,6 +21,7 @@ public:
 
     // needed for valarray operations like x /= x.size() 
     // when x is a std::valarray<mxComplexSingleClass>
+
     template <typename _Tp>
     mxComplexSingleClass(const _Tp& _real) {
         real = _real;
@@ -40,7 +42,7 @@ public:
 
     mxComplexSingleClass polar(mxComplexSingleClass& x) {
         mxComplexSingleClass z;
-        z.real = std::sqrt(x.imag * x.imag + x.real * x.real);
+        z.real = norm(x);
         z.imag = std::atan2(x.imag, x.real);
         return z;
     }
@@ -51,21 +53,25 @@ public:
         z.imag = r * std::sin(phi);
         return z;
     }
-
+    
+    float abs() {
+        return norm(*this);
+    }
+    
+    static float norm(const mxComplexSingleClass& z) {
+        return std::sqrt(z.real * z.real + z.imag * z.imag);
+    }
 
     template <typename _Tp>
     mxComplexSingleClass operator/(const _Tp& rhs) {
-        mxComplexSingleClass z;
-        return z;
-    }
-
-    mxComplexSingleClass operator/(const mxComplexSingleClass& rhs) {
-        mxComplexSingleClass z;
+        mxComplexSingleClass z = *this;
+        z /= rhs;        
         return z;
     }
 
     mxComplexSingleClass operator*(const mxComplexSingleClass& rhs) {
-        mxComplexSingleClass z;
+        mxComplexSingleClass z = *this;
+        z *= rhs;
         return z;
     }
 
@@ -77,8 +83,7 @@ public:
 
     mxComplexSingleClass operator-(const mxComplexSingleClass& rhs) {
         mxComplexSingleClass z = *this;
-        z.real -= rhs.real;
-        z.imag -= rhs.imag;
+        z -= rhs;
         return z;
     }
 
@@ -88,6 +93,7 @@ public:
         imag = 0;
         return *this;
     }
+
     mxComplexSingleClass& operator=(const float& other) {
         real = other;
         imag = 0;
@@ -95,8 +101,8 @@ public:
     }
 
     mxComplexSingleClass& operator=(const mxComplexSingleClass& other) {
-        real += other.real;
-        imag += other.imag;
+        real = other.real;
+        imag = other.imag;
         return *this;
     }
 
@@ -108,12 +114,26 @@ public:
     }
 
     template <typename _Tp>
-    mxComplexSingleClass& operator*=(const _Tp& rhs) {
-        real += rhs.real;
-        imag += rhs.imag;
+    mxComplexSingleClass& operator-=(const _Tp& rhs) {
+        real -= rhs.real;
+        imag -= rhs.imag;
         return *this;
     }
-    
+
+    template <typename _Tp>
+    mxComplexSingleClass& operator*=(const _Tp& rhs) {        
+        imag *= rhs;
+        real *= rhs;
+        return *this;
+    }
+
+    mxComplexSingleClass& operator*=(const mxComplexSingleClass& rhs) {
+        const float __r = real * rhs.real - imag * rhs.imag;
+        imag = real * rhs.imag + imag * rhs.real;
+        real = __r;
+        return *this;
+    }
+
     template <typename _Tp>
     mxComplexSingleClass& operator/=(const _Tp& rhs) {
         real /= rhs;
@@ -121,44 +141,13 @@ public:
         return *this;
     }
 
-    mxComplexSingleClass& operator/=(const std::size_t& rhs) {
-        real /= rhs;
-        imag /= rhs;
-        return *this;
-    }
-
     mxComplexSingleClass& operator/=(const mxComplexSingleClass& rhs) {
-        real /= rhs.real;
-        imag /= rhs.imag;
+        const float __r = real * rhs.real + imag * rhs.imag;
+        const float __n = norm(rhs);
+        imag = (imag * rhs.real - real * rhs.imag) / __n;
+        real = __r / __n;
         return *this;
     }
-
-    //  // 26.2.5/13
-//  // XXX: This is a grammar school implementation.
-//  template<typename _Tp>
-//    template<typename _Up>
-//    complex<_Tp>&
-//    complex<_Tp>::operator*=(const complex<_Up>& __z)
-//    {
-//      const _Tp __r = _M_real * __z.real() - _M_imag * __z.imag();
-//      _M_imag = _M_real * __z.imag() + _M_imag * __z.real();
-//      _M_real = __r;
-//      return *this;
-//    }
-//
-//  // 26.2.5/15
-//  // XXX: This is a grammar school implementation.
-//  template<typename _Tp>
-//    template<typename _Up>
-//    complex<_Tp>&
-//    complex<_Tp>::operator/=(const complex<_Up>& __z)
-//    {
-//      const _Tp __r =  _M_real * __z.real() + _M_imag * __z.imag();
-//      const _Tp __n = std::norm(__z);
-//      _M_imag = (_M_imag * __z.real() - _M_real * __z.imag()) / __n;
-//      _M_real = __r / __n;
-//      return *this;
-//    }
 };
 
 #define REAL(vec) (vec.x)
