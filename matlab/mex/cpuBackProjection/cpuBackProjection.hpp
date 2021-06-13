@@ -8,6 +8,7 @@
 #ifndef CPUBACKPROJECTION_HPP
 #define CPUBACKPROJECTION_HPP
 
+#include <iostream>
 #include <cmath>
 
 #include <mex.h>    // Matlab library includes
@@ -19,13 +20,14 @@ public:
     mxComplexSingleClass() {
     }
 
-    // needed for valarray operations like x /= x.size() 
-    // when x is a std::valarray<mxComplexSingleClass>
+    mxComplexSingleClass(mxComplexSingle& x) {
+        real = x.real;
+        imag = x.imag;
+    }
 
-    template <typename _Tp>
-    mxComplexSingleClass(const _Tp& _real) {
-        real = _real;
-        imag = 0;
+    mxComplexSingleClass(mxComplexSingle* x) {
+        real = x->real;
+        imag = x->imag;
     }
 
     mxComplexSingleClass(const float& _real, const float& _imag) {
@@ -33,101 +35,115 @@ public:
         imag = _imag;
     }
 
-    static mxComplexSingleClass conj(const mxComplexSingleClass& x) {
+    // needed for valarray operations like x /= x.size() 
+    // when x is a std::valarray<mxComplexSingleClass>    
+
+    template <typename _Tp>
+    inline mxComplexSingleClass(const _Tp& _real) {
+        real = _real;
+        imag = 0;
+    }
+
+    inline static mxComplexSingleClass conj(const mxComplexSingleClass& x) {
         mxComplexSingleClass z;
         z.real = x.real;
         z.imag = -x.imag;
         return z;
     }
 
-    mxComplexSingleClass polar(mxComplexSingleClass& x) {
+    inline static mxComplexSingleClass polar(mxComplexSingleClass& x) {
         mxComplexSingleClass z;
         z.real = norm(x);
         z.imag = std::atan2(x.imag, x.real);
         return z;
     }
 
-    static mxComplexSingleClass polar(const float& r, const float& phi) {
+    inline static mxComplexSingleClass polar(const float& r, const float& phi) {
         mxComplexSingleClass z;
         z.real = r * std::cos(phi);
         z.imag = r * std::sin(phi);
         return z;
     }
-    
-    float abs() {
-        return norm(*this);
-    }
-    
-    static float norm(const mxComplexSingleClass& z) {
+
+    inline static float norm(const mxComplexSingleClass& z) {
         return std::sqrt(z.real * z.real + z.imag * z.imag);
     }
 
+    inline float abs() {
+        return norm(*this);
+    }
+
+
     template <typename _Tp>
-    mxComplexSingleClass operator/(const _Tp& rhs) {
+    inline mxComplexSingleClass operator/(const _Tp& rhs) {
         mxComplexSingleClass z = *this;
-        z /= rhs;        
+        z /= rhs;
         return z;
     }
 
-    mxComplexSingleClass operator*(const mxComplexSingleClass& rhs) {
+    inline mxComplexSingleClass operator*(const mxComplexSingleClass& rhs) {
         mxComplexSingleClass z = *this;
         z *= rhs;
         return z;
     }
 
-    mxComplexSingleClass operator+(const mxComplexSingleClass& rhs) {
+    inline mxComplexSingleClass operator+(const mxComplexSingleClass& rhs) {
         mxComplexSingleClass z = *this;
         z += rhs;
         return z;
     }
 
-    mxComplexSingleClass operator-(const mxComplexSingleClass& rhs) {
+    inline mxComplexSingleClass operator-(const mxComplexSingleClass& rhs) {
         mxComplexSingleClass z = *this;
         z -= rhs;
         return z;
     }
 
     template <typename _Tp>
-    mxComplexSingleClass operator=(const _Tp& other) {
+    inline mxComplexSingleClass operator=(const _Tp& other) {
         real = other;
         imag = 0;
         return *this;
     }
 
-    mxComplexSingleClass& operator=(const float& other) {
-        real = other;
-        imag = 0;
-        return *this;
-    }
-
-    mxComplexSingleClass& operator=(const mxComplexSingleClass& other) {
+    inline mxComplexSingleClass& operator=(const mxComplexSingleClass& other) {
         real = other.real;
         imag = other.imag;
         return *this;
     }
 
     template <typename _Tp>
-    mxComplexSingleClass& operator+=(const _Tp& rhs) {
+    inline mxComplexSingleClass& operator+=(const _Tp& rhs) {
+        real += rhs;
+        return *this;
+    }
+
+    inline mxComplexSingleClass& operator+=(const mxComplexSingleClass& rhs) {
         real += rhs.real;
         imag += rhs.imag;
         return *this;
     }
 
     template <typename _Tp>
-    mxComplexSingleClass& operator-=(const _Tp& rhs) {
+    inline mxComplexSingleClass& operator-=(const _Tp& rhs) {
+        real -= rhs;
+        return *this;
+    }
+
+    inline mxComplexSingleClass& operator-=(const mxComplexSingleClass& rhs) {
         real -= rhs.real;
         imag -= rhs.imag;
         return *this;
     }
 
     template <typename _Tp>
-    mxComplexSingleClass& operator*=(const _Tp& rhs) {        
+    inline mxComplexSingleClass& operator*=(const _Tp& rhs) {
         imag *= rhs;
         real *= rhs;
         return *this;
     }
 
-    mxComplexSingleClass& operator*=(const mxComplexSingleClass& rhs) {
+    inline mxComplexSingleClass& operator*=(const mxComplexSingleClass& rhs) {
         const float __r = real * rhs.real - imag * rhs.imag;
         imag = real * rhs.imag + imag * rhs.real;
         real = __r;
@@ -135,20 +151,79 @@ public:
     }
 
     template <typename _Tp>
-    mxComplexSingleClass& operator/=(const _Tp& rhs) {
+    inline mxComplexSingleClass& operator/=(const _Tp& rhs) {
         real /= rhs;
         imag /= rhs;
         return *this;
     }
 
-    mxComplexSingleClass& operator/=(const mxComplexSingleClass& rhs) {
+    inline mxComplexSingleClass& operator/=(const mxComplexSingleClass& rhs) {
         const float __r = real * rhs.real + imag * rhs.imag;
         const float __n = norm(rhs);
         imag = (imag * rhs.real - real * rhs.imag) / __n;
         real = __r / __n;
         return *this;
     }
+    //friend _GLIBCXX_CONSTEXPR bool operator==(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y);
+    friend std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass &c);
+    friend std::istream& operator>>(std::istream& input, const mxComplexSingleClass& c);
 };
+
+// Templates for constant expressions with ==
+
+inline _GLIBCXX_CONSTEXPR bool
+operator==(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    return __x.real == __y.real && __x.imag == __y.imag;
+}
+
+template<typename _Tp>
+inline _GLIBCXX_CONSTEXPR bool
+operator==(const mxComplexSingleClass& __x, const _Tp& __y) {
+    return __x.real == __y && __x.imag == _Tp();
+}
+
+template<typename _Tp>
+inline _GLIBCXX_CONSTEXPR bool
+operator==(const _Tp& __x, const mxComplexSingleClass& __y) {
+    return __x == __y.real && _Tp() == __y.imag;
+}
+
+// Templates for constant expressions with !=
+
+template<typename _Tp>
+inline _GLIBCXX_CONSTEXPR bool
+operator!=(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    return __x.real != __y.real || __x.imag != __y.imag;
+}
+
+template<typename _Tp>
+inline _GLIBCXX_CONSTEXPR bool
+operator!=(const mxComplexSingleClass& __x, const _Tp& __y) {
+    return __x.real != __y || __x.imag != _Tp();
+}
+
+template<typename _Tp>
+inline _GLIBCXX_CONSTEXPR bool
+operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
+    return __x != __y.real || _Tp() != __y.imag;
+}
+
+// std::cout << "Enter a complex number (a+bi) : " << std::endl;
+// std::cin >> x;
+
+std::istream& operator>>(std::istream& input, mxComplexSingleClass& __x) {
+    char plus;
+    char i;
+    input >> __x.real >> plus >> __x.imag >> i;
+    return input;
+}
+///  Insertion operator for complex values.
+
+std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass& __x) {
+    output << __x.real << ((__x.imag <= 0) ? "" : "+") << __x.imag << "i";
+    return output;
+}
+
 
 #define REAL(vec) (vec.x)
 #define IMAG(vec) (vec.y)

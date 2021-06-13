@@ -371,8 +371,11 @@ void run_bp(mxComplexSingle* phd, float* xObs, float* yObs, float* zObs, float* 
      */
 
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
-        std::vector<mxComplexSingle> phaseData(phd, phd + Nfft);
-        //ifft(phaseData);
+        CArray phaseData(phd, Nfft);
+        ifft(phaseData);
+        for (int i=0; i < 5; i++) {
+            std::cout << phaseData[i] << std::endl;
+        }
     }
 }
 
@@ -460,5 +463,4 @@ void ifft(CArray& x) {
 
     // scale the numbers
     x /= x.size();    
-    //x = x.apply([](int val) { return val * 2; });
 }
