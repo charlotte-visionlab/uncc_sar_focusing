@@ -56,6 +56,7 @@ public:
 
     template <typename _Tp>
     inline mxComplexSingleClass(const _Tp& _real) {
+        std::cout << "hereA " << std::endl;
         real = _real;
         imag = 0.0f;
     }

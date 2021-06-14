@@ -39,11 +39,30 @@ typedef struct {
 /* To work seamlessly with Hartley's codebase */
 typedef complex_split bp_complex_split;
 
-//typedef std::complex<double> Complex;
-typedef mxComplexSingleClass Complex;
+#ifndef NO_MATLAB
 
-typedef std::valarray<mxComplexSingleClass> CArray;
-typedef std::vector<mxComplexSingleClass> CVector;
+typedef mxComplexSingleClass Complex;
+#define polarToComplex mxComplexSingleClass::polar
+#define conjugateComplex mxComplexSingleClass::conj
+
+#else
+
+/*
+#include <complex>
+typedef std::complex<float> Complex;
+#define polarToComplex std::polar
+#define conjugateComplex std::conj
+*/
+
+typedef mxComplexSingleClass Complex;
+#define polarToComplex mxComplexSingleClass::polar
+#define conjugateComplex mxComplexSingleClass::conj
+
+
+#endif
+
+typedef std::valarray<Complex> CArray;
+typedef std::vector<Complex> CVector;
 
 /***
  * Prototypes
@@ -83,10 +102,15 @@ float extract_f0(float* vec, int N) {
     return vec[0];
 }
 
+void fft(CArray& x);
 void ifft(CArray& x);
+void fftw(CArray& x);
+void ifftw(CArray& x);
+
 CArray fftshift(CArray& fft);
 
 #ifndef NO_MATLAB
+
 /* 
  * Application parameters:
  *  - range profiles
@@ -420,7 +444,8 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
             if (dR < max_Rvec) {
                 rvecIdx_end = yIdx;
             }
-            phCorr[xIdx * Nrangebins + yIdx] = Complex::polar(1.0f, 4.0f * PI * minF[xIdx] * dR / CLIGHT);
+            //phCorr[xIdx * Nrangebins + yIdx] = Complex::polar(1.0f, 4.0f * PI * minF[xIdx] * dR / CLIGHT);
+            phCorr[xIdx * Nrangebins + yIdx] = polarToComplex(1.0f, 4.0f * PI * minF[xIdx] * dR / CLIGHT);
         }
         if (rvecIdx_start != -1) {
             rangeSlices.push_back(std::slice(rvecIdx_start, rvecIdx_end, 1));
@@ -441,17 +466,22 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
             ii = 0;
             for (auto phaseSample : phaseData) {
                 std::cout << "ph " << phaseSample << std::endl;
-                if (++ii == 10)
-                    break;
+                /*
+                                if (++ii == 10)
+                                    break;
+                 */
             }
         }
-        ifft(phaseData);
+        //ifft(phaseData);
+        ifftw(phaseData);
         if (pulseIndex == 0) {
             ii = 0;
             for (auto phaseSample : phaseData) {
-                std::cout << "fft " << phaseSample << std::endl;
-                if (++ii == 10)
-                    break;
+                std::cout << "ifft " << phaseSample << std::endl;
+                /*
+                                if (++ii == 10)
+                                    break;
+                 */
             }
         }
         CArray rangeCompressed = fftshift(phaseData);
@@ -459,8 +489,10 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
             ii = 0;
             for (auto range : rangeCompressed) {
                 std::cout << "rc " << range << std::endl;
-                if (++ii == 10)
-                    break;
+                /*
+                                if (++ii == 10)
+                                    break;
+                 */
             }
         }
         CArray validRanges = rangeCompressed[rangeSlices[pulseIndex]];
@@ -477,6 +509,31 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
     }
 }
 
+//#define FFTW_ENABLE_FLOAT
+#include <fftw3.h>
+
+void fftw_engine(CArray& x, int dir) {
+    int N = x.size();
+    //fftw_complex in[N], out[N];
+    fftwf_plan p;
+    // http://www.fftw.org/fftw3_doc/Complex-numbers.html
+    // Structure must be only two numbers in the order real, imag
+    // to be binary compatible with the C99 complex type
+    //fftw_complex* in = reinterpret_cast<fftw_complex*>(&x[0]);
+    fftwf_complex* in = reinterpret_cast<fftwf_complex*>(&x[0]);
+    p = fftwf_plan_dft_1d(N, in, nullptr, dir, FFTW_ESTIMATE);
+    fftwf_execute(p);
+    fftwf_destroy_plan(p);
+}
+
+void fftw(CArray& x) {
+    fftw_engine(x, FFTW_FORWARD);
+}
+
+void ifftw(CArray& x) {
+    fftw_engine(x, FFTW_BACKWARD);
+}
+
 CArray fftshift(CArray& fft) {
     int N = fft.size();
     int splitIdx = std::ceil(N / 2);
@@ -488,10 +545,11 @@ CArray fftshift(CArray& fft) {
     fftshift[std::slice(splitIdx + 1, N, 1)] = fft[std::slice(0, splitIdx, 1)];
     return fftshift;
 }
+
 // Cooley–Tukey FFT (in-place, divide-and-conquer)
 // Higher memory requirements and redundancy although more intuitive
 
-void fft(CArray& x) {
+void fft_alt(CArray& x) {
     const size_t N = x.size();
     if (N <= 1) return;
 
@@ -500,12 +558,13 @@ void fft(CArray& x) {
     CArray odd = x[std::slice(1, N / 2, 2)];
 
     // conquer
-    fft(even);
-    fft(odd);
+    fft_alt(even);
+    fft_alt(odd);
 
     // combine
     for (size_t k = 0; k < N / 2; ++k) {
-        Complex t = Complex::polar(1.0f, -2.0f * PI * k / N) * odd[k];
+        //Complex t = Complex::polar(1.0f, -2.0f * PI * k / N) * odd[k];
+        Complex t = polarToComplex(1.0f, -2.0f * PI * k / N) * odd[k];
         x[k ] = even[k] + t;
         x[k + N / 2] = even[k] - t;
     }
@@ -516,7 +575,7 @@ void fft(CArray& x) {
 // !!! Warning : in some cases this code make result different from not optimized version above (need to fix bug)
 // The bug is now fixed @2017/05/30 
 
-void fft_alt(CArray &x) {
+void fft(CArray &x) {
     // DFT
     unsigned int N = x.size(), k = N, n;
     double thetaT = 3.14159265358979323846264338328L / N;
@@ -560,36 +619,56 @@ void fft_alt(CArray &x) {
 
 void ifft(CArray& x) {
     // conjugate the complex numbers
-    x = x.apply(mxComplexSingleClass::conj);
+    //x = x.apply(mxComplexSingleClass::conj);
+    x = x.apply(conjugateComplex);
 
     // forward fft
     fft(x);
 
     // conjugate the complex numbers again
-    x = x.apply(mxComplexSingleClass::conj);
+    //x = x.apply(mxComplexSingleClass::conj);
+    x = x.apply(conjugateComplex);
 
     // scale the numbers
     x /= x.size();
 }
 
 int main(int argc, char **argv) {
-    const Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
+    Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
+    Complex out[8];
     CArray data(test, 8);
 
     // forward fft
-    fft(data);
-
+    //fftw(data);
+    int N = 8;
+    //fftw_complex in[N], out[N];
+    std::cout << "st " << sizeof(test) << std::endl;
+    
+    // http://www.fftw.org/fftw3_doc/Complex-numbers.html
+    // Structure must be only two numbers in the order real, imag
+    // to be binary compatible with the C99 complex type
+    //fftw_complex* in = reinterpret_cast<fftw_complex*>(&x[0]);
+    //fftw_complex* in = reinterpret_cast<fftw_complex*>(&test[0]);
+    //fftw_complex* out1 = reinterpret_cast<fftw_complex*>(&out[0]);
+    fftwf_plan p = fftwf_plan_dft_1d(N, 
+            reinterpret_cast<fftwf_complex*> (&test[0]), 
+            reinterpret_cast<fftwf_complex*> (&out[0]),
+            FFTW_FORWARD, FFTW_ESTIMATE);
+    fftwf_execute(p);
+    fftwf_destroy_plan(p);
     std::cout << "fft" << std::endl;
     for (int i = 0; i < 8; ++i) {
-        std::cout << data[i] << std::endl;
+        std::cout << out[i] << std::endl;
     }
 
     // inverse fft
-    ifft(data);
+    //ifftw(data);
 
+/*
     std::cout << std::endl << "ifft" << std::endl;
     for (int i = 0; i < 8; ++i) {
         std::cout << data[i] << std::endl;
     }
+*/
     return EXIT_SUCCESS;
 }

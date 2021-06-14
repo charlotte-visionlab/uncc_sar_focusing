@@ -8,7 +8,7 @@ set(CPP_FILE cpuBackProjection)
 # set up cuda & matlab libraries
 set(CPP_FILE_NAME ${CPP_FILE}.cpp)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -fPIC -DMATLAB_MEX_FILE -g -O0")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -DMATLAB_MEX_FILE -g -O0")
 
 include_directories(
     ${Matlab_INCLUDE_DIRS}
@@ -16,12 +16,14 @@ include_directories(
 )
 
 add_library(${CPP_FILE} SHARED ${${CPP_FILE}} ${CPP_FILE_NAME} ${MATLAB_PROJECT_DIR}/Matlabdef.def)
-target_link_libraries(${CPP_FILE} ${MATLAB_LIBRARIES})# ${FFTW_LIBRARIES})
+target_link_libraries(${CPP_FILE} ${MATLAB_LIBRARIES} -lfftw3f)# ${FFTW_LIBRARIES})
 set_target_properties(${CPP_FILE} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
+
+#add_definitions(/DFFTW_ENABLE_FLOAT)
 
 add_executable(cpuBackProjection_test
     cpuBackProjection.cpp)
-target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES})# ${FFTW_LIBRARIES})
+target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} -lfftw3f)# ${FFTW_LIBRARIES})
 set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 # 32-bit or 64-bit mex
 if(WIN32)
