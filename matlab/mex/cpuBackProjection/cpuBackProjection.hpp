@@ -11,8 +11,27 @@
 #include <iostream>
 #include <cmath>
 
+#ifndef NO_MATLAB
 #include <mex.h>    // Matlab library includes
 #include <matrix.h> // Matlab mxComplexSingle struct
+#else
+typedef float mxSingle;
+
+typedef struct {
+    mxSingle real, imag;
+} mxComplexSingle;
+#endif
+
+// TODO: We should be extending mxComplexSingle with an ExpressionTemplate class
+//       then extending the ExpressionTemplate class with the mxComplexSingleClass
+// Reference and explanation of Expression Templates:
+//  https://en.wikipedia.org/wiki/Expression_templates
+// Why implementing them may be valuable for performance:
+//  https://stackoverflow.com/questions/6850807/why-is-valarray-so-slow
+// Note: Boost's multi-precision complex handles expression templates
+//  https://www.boost.org/doc/libs/develop/libs/multiprecision/doc/html/boost_multiprecision/tut/complex/cpp_complex.html
+// std::comples implementation
+//  https://code.woboq.org/gcc/libstdc++-v3/include/std/complex.html
 
 class mxComplexSingleClass : public mxComplexSingle {
 public:
@@ -21,16 +40,13 @@ public:
     }
 
     mxComplexSingleClass(mxComplexSingle& x) {
+        //std::cout << "here1 " << x.real << std::endl;
         real = x.real;
         imag = x.imag;
     }
 
-    mxComplexSingleClass(mxComplexSingle* x) {
-        real = x->real;
-        imag = x->imag;
-    }
-
     mxComplexSingleClass(const float& _real, const float& _imag) {
+        //std::cout << "here2 " << _real << std::endl;
         real = _real;
         imag = _imag;
     }
@@ -41,7 +57,7 @@ public:
     template <typename _Tp>
     inline mxComplexSingleClass(const _Tp& _real) {
         real = _real;
-        imag = 0;
+        imag = 0.0f;
     }
 
     inline static mxComplexSingleClass conj(const mxComplexSingleClass& x) {
@@ -58,21 +74,29 @@ public:
         return z;
     }
 
-    inline static mxComplexSingleClass polar(const float& r, const float& phi) {
-        mxComplexSingleClass z;
-        z.real = r * std::cos(phi);
-        z.imag = r * std::sin(phi);
-        return z;
+    // TODO: functions log(), cos(), sin(), tan(), sqrt() not implemented
+
+    template <typename _Tp>
+    inline static mxComplexSingleClass polar(const _Tp& r, const _Tp& phi) {
+        return mxComplexSingleClass(r * std::cos(phi), r * std::sin(phi));
     }
 
     inline static float norm(const mxComplexSingleClass& z) {
-        return std::sqrt(z.real * z.real + z.imag * z.imag);
+        const float __x = z.real;
+        const float __y = z.imag;
+        return __x * __x + __y * __y;
     }
 
-    inline float abs() {
-        return norm(*this);
+    inline static float abs(const mxComplexSingleClass& z) {
+        float __x = z.real;
+        float __y = z.imag;
+        const float __s = std::max(std::abs(__x), std::abs(__y));
+        if (__s == 0.0f)
+            return __s;
+        __x /= __s;
+        __y /= __s;
+        return __s * std::sqrt(__x * __x + __y * __y);
     }
-
 
     template <typename _Tp>
     inline mxComplexSingleClass operator/(const _Tp& rhs) {
@@ -150,6 +174,15 @@ public:
         return *this;
     }
 
+    inline mxComplexSingleClass& operator/=(const mxComplexSingleClass& rhs) {
+        //std::cout << "this=" << *this << " rhs=" << rhs << std::endl;
+        const float __r = real * rhs.real + imag * rhs.imag;
+        const float __n = norm(rhs);
+        imag = (imag * rhs.real - real * rhs.imag) / __n;
+        real = __r / __n;
+        return *this;
+    }
+
     template <typename _Tp>
     inline mxComplexSingleClass& operator/=(const _Tp& rhs) {
         real /= rhs;
@@ -157,13 +190,6 @@ public:
         return *this;
     }
 
-    inline mxComplexSingleClass& operator/=(const mxComplexSingleClass& rhs) {
-        const float __r = real * rhs.real + imag * rhs.imag;
-        const float __n = norm(rhs);
-        imag = (imag * rhs.real - real * rhs.imag) / __n;
-        real = __r / __n;
-        return *this;
-    }
     //friend _GLIBCXX_CONSTEXPR bool operator==(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y);
     friend std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass &c);
     friend std::istream& operator>>(std::istream& input, const mxComplexSingleClass& c);
@@ -220,7 +246,7 @@ inline std::istream& operator>>(std::istream& input, mxComplexSingleClass& __x) 
 ///  Insertion operator for complex values.
 
 inline std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass& __x) {
-    output << __x.real << ((__x.imag <= 0) ? "" : "+") << __x.imag << "i";
+    output << __x.real << ((__x.imag < 0) ? "" : "+") << __x.imag << "i";
     return output;
 }
 

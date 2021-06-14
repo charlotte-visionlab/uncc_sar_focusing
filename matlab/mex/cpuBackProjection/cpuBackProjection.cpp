@@ -56,15 +56,12 @@ float2* format_complex(bp_complex_split a, int size);
 
 float4* format_x_y_z_r(float * x, float * y, float * z, float * r, int size);
 
-void run_bp(mxComplexSingle* phd,
-        float* xObs, float* yObs, float* zObs, float* r,
-        int my_num_phi, int my_proj_length, int nxout, int nyout,
-        int image_chunk_width, int image_chunk_height,
-        int device,
-        mxComplexSingle* host_output_image,
+void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
+        int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int Nfft,
+        int blockwidth, int blockheight,
+        int deviceId, const CArray& output_image,
         int start_output_index, int num_output_rows,
-        float c__4_delta_freq, float pi_4_f0__clight,
-        float* minF, float* deltaF,
+        float c__4_delta_freq, float pi_4_f0__clight, float* minF, float* deltaF,
         float left, float right, float bottom, float top,
         float min_eff_idx, float total_proj_length);
 
@@ -85,8 +82,11 @@ float extract_f0(float* vec, int N) {
      */
     return vec[0];
 }
-void ifft(CArray& x);
 
+void ifft(CArray& x);
+CArray fftshift(CArray& fft);
+
+#ifndef NO_MATLAB
 /* 
  * Application parameters:
  *  - range profiles
@@ -121,7 +121,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     float min_eff_idx; //, Nrangebins;
 
     /* Subsection B: these are computed from the matlab inputs */
-    int Npulses, Nrangebins;
+    int Npulses, Nrangebins, Nfft;
     float c__4_delta_freq;
     float pi_4_f0__clight;
 
@@ -159,18 +159,19 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     Nx_pix = (int) mxGetScalar(prhs[7]);
     Ny_pix = (int) mxGetScalar(prhs[8]);
 
-    left = (float) mxGetScalar(prhs[ 9]);
-    right = (float) mxGetScalar(prhs[10]);
-    bottom = (float) mxGetScalar(prhs[11]);
-    top = (float) mxGetScalar(prhs[12]);
+    Nfft = (int) mxGetScalar(prhs[9]);
+    left = (float) mxGetScalar(prhs[10]);
+    right = (float) mxGetScalar(prhs[11]);
+    bottom = (float) mxGetScalar(prhs[12]);
+    top = (float) mxGetScalar(prhs[13]);
 
     /* Section 3.
      * Set up some intermediate values */
 
 
-    if (nrhs == 15) {
-        min_eff_idx = (float) mxGetScalar(prhs[13]);
-        Nrangebins = (float) mxGetScalar(prhs[14]);
+    if (nrhs == 16) {
+        min_eff_idx = (float) mxGetScalar(prhs[14]);
+        Nrangebins = (float) mxGetScalar(prhs[15]);
     } else {
         min_eff_idx = 0;
         //Nrangebins = Nrangebins;
@@ -192,15 +193,30 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     output_image = mxGetComplexSingles(plhs[0]);
     //output_image.real = (float*) mxGetPr(plhs[0]);
     //output_image.imag = (float*) mxGetPi(plhs[0]);
+    mxComplexSingleClass* range_profiles_cast = static_cast<mxComplexSingleClass*> (range_profiles);
+    mxComplexSingleClass* output_image_cast = static_cast<mxComplexSingleClass*> (output_image);
 
-    /* Section 5.
-     * Call Hartley's GPU initialization & invocation code */
-    run_bp(range_profiles, xobs, yobs, zobs,
+    CArray range_profiles_arr(range_profiles_cast, Npulses * Nrangebins);
+    CArray output_image_arr(output_image_cast, Ny_pix * Nx_pix);
+    /*
+        std::cout << "size = " << range_profiles_arr.size() << std::endl;
+        int ii;
+        for (int pulseIndex = 0; pulseIndex < 2; pulseIndex++) {
+            CArray phaseData = range_profiles_arr[std::slice(pulseIndex*Nfft, (pulseIndex + 1) * Nfft, 1)];
+            ii = 0;
+            for (auto phaseSample : phaseData) {
+                std::cout << "ph " << phaseSample << std::endl;
+                if (++ii == 10)
+                    break;
+            }
+        }
+     */
+    run_bp(range_profiles_arr, xobs, yobs, zobs,
             aimpoint_ranges,
-            Npulses, Nrangebins, Nx_pix, Ny_pix,
+            Npulses, Nrangebins, Nx_pix, Ny_pix, Nfft,
             blockwidth, blockheight,
             deviceId,
-            output_image,
+            output_image_arr,
             0, Ny_pix,
             c__4_delta_freq, pi_4_f0__clight,
             minF, deltaF,
@@ -208,6 +224,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
 
     return;
 }
+#endif
 
 void from_gpu_complex_to_bp_complex_split(float2 * data, bp_complex_split out, int size) {
     int i;
@@ -253,9 +270,10 @@ float4* format_x_y_z_r(float * x, float * y, float * z, float * r, int size) {
     return out;
 }
 
-void run_bp(mxComplexSingle* phd, float* xObs, float* yObs, float* zObs, float* r,
-        int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int blockwidth,
-        int blockheight, int deviceId, mxComplexSingle* output_image,
+void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
+        int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int Nfft,
+        int blockwidth, int blockheight,
+        int deviceId, const CArray& output_image,
         int start_output_index, int num_output_rows,
         float c__4_delta_freq, float pi_4_f0__clight, float* minF, float* deltaF,
         float left, float right, float bottom, float top,
@@ -325,11 +343,19 @@ void run_bp(mxComplexSingle* phd, float* xObs, float* yObs, float* zObs, float* 
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
      */
-    int Nfft = Nrangebins;
     float r_vec[Nfft];
+    float min_Rvec = std::numeric_limits<float>::infinity();
+    float max_Rvec = -std::numeric_limits<float>::infinity();
     for (int rIdx = 0; rIdx < Nfft; rIdx++) {
-        float rVal = (float) ((-Nfft / 2.0f) + ((float) rIdx) / Nfft) * maxWr / Nfft;
+        // -maxWr/2:maxWr/Nfft:maxWr/2
+        float rVal = ((float) rIdx / Nfft - 0.5f) * maxWr;
         r_vec[rIdx] = rVal;
+        if (min_Rvec > r_vec[rIdx]) {
+            min_Rvec = r_vec[rIdx];
+        }
+        if (max_Rvec < r_vec[rIdx]) {
+            max_Rvec = r_vec[rIdx];
+        }
     }
 
     /*
@@ -369,18 +395,99 @@ void run_bp(mxComplexSingle* phd, float* xObs, float* yObs, float* zObs, float* 
         t(ii) = toc;
     end
      */
-
-    for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
-        CArray phaseData(phd, Nfft);
+    CArray phCorr(Nrangebins * Npulses);
+    float4 target;
+    target.x = left;
+    target.z = 0;
+    float delta_x = (right - left) / (Npulses - 1);
+    float delta_y = (top - bottom) / (Nrangebins - 1);
+    int rvecIdx_start, rvecIdx_end;
+    std::vector<std::slice> rangeSlices;
+    for (int xIdx = 0; xIdx < Npulses; xIdx++) {
+        target.x += delta_x;
+        target.y = bottom;
+        rvecIdx_start = -1;
+        rvecIdx_end = -1;
+        for (int yIdx = 0; yIdx < Nrangebins; yIdx++) {
+            target.y += delta_y;
+            float dR = std::sqrt((xObs[xIdx] - target.x) * (xObs[xIdx] - target.x) +
+                    (yObs[xIdx] - target.y) * (yObs[xIdx] - target.y) +
+                    (zObs[xIdx] - target.z) * (zObs[xIdx] - target.z)) - r[xIdx];
+            // construct slices here if
+            if (dR < min_Rvec) {
+                rvecIdx_start = yIdx;
+            }
+            if (dR < max_Rvec) {
+                rvecIdx_end = yIdx;
+            }
+            phCorr[xIdx * Nrangebins + yIdx] = Complex::polar(1.0f, 4.0f * PI * minF[xIdx] * dR / CLIGHT);
+        }
+        if (rvecIdx_start != -1) {
+            rangeSlices.push_back(std::slice(rvecIdx_start, rvecIdx_end, 1));
+        } else {
+            rangeSlices.push_back(std::slice());
+        }
+    }
+    int ii;
+    ii = 0;
+    for (auto rvecSamp : r_vec) {
+        std::cout << "r_vec " << rvecSamp << std::endl;
+        if (++ii == 10)
+            break;
+    }
+    for (int pulseIndex = 0; pulseIndex < 1; pulseIndex++) {
+        CArray phaseData = phd[std::slice(pulseIndex * Nfft, (pulseIndex + 1) * Nfft, 1)];
+        if (pulseIndex == 0) {
+            ii = 0;
+            for (auto phaseSample : phaseData) {
+                std::cout << "ph " << phaseSample << std::endl;
+                if (++ii == 10)
+                    break;
+            }
+        }
         ifft(phaseData);
-        CArray fftshift(Nfft);
-        fftshift[std::slice(0, Nfft / 2, 1)] = phaseData[std::slice(Nfft / 2 + 1, Nfft, 1)];
-        fftshift[std::slice(Nfft/2 + 1, Nfft, 1)] = phaseData[std::slice(0, Nfft/2, 1)];
-        std::cout << fftshift[0] << std::endl;
+        if (pulseIndex == 0) {
+            ii = 0;
+            for (auto phaseSample : phaseData) {
+                std::cout << "fft " << phaseSample << std::endl;
+                if (++ii == 10)
+                    break;
+            }
+        }
+        CArray rangeCompressed = fftshift(phaseData);
+        if (pulseIndex == 0) {
+            ii = 0;
+            for (auto range : rangeCompressed) {
+                std::cout << "rc " << range << std::endl;
+                if (++ii == 10)
+                    break;
+            }
+        }
+        CArray validRanges = rangeCompressed[rangeSlices[pulseIndex]];
+        if (pulseIndex == 0) {
+            ii = 0;
+            for (auto vrange : validRanges) {
+                std::cout << "dR " << vrange << std::endl;
+                if (++ii == 10)
+                    break;
+            }
+        }
+        // Vq = interp1(X,V,Xq) interpolates to find Vq, the values of the
+        // underlying function V=F(X) at the query points Xq.
     }
 }
 
-
+CArray fftshift(CArray& fft) {
+    int N = fft.size();
+    int splitIdx = std::ceil(N / 2);
+    CArray fftshift(N);
+    // Could use circular shift but I suspect this slicing approach may
+    // have marginal performance benefits.
+    //valarray<T> cshift( int count ) const;
+    fftshift[std::slice(0, splitIdx, 1)] = fft[std::slice(splitIdx + 1, N, 1)];
+    fftshift[std::slice(splitIdx + 1, N, 1)] = fft[std::slice(0, splitIdx, 1)];
+    return fftshift;
+}
 // Cooley–Tukey FFT (in-place, divide-and-conquer)
 // Higher memory requirements and redundancy although more intuitive
 
@@ -406,7 +513,7 @@ void fft(CArray& x) {
 
 // Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
 // Better optimized but less intuitive
-// !!! Warning : in some cases this code make result different from not optimased version above (need to fix bug)
+// !!! Warning : in some cases this code make result different from not optimized version above (need to fix bug)
 // The bug is now fixed @2017/05/30 
 
 void fft_alt(CArray &x) {
@@ -461,7 +568,28 @@ void ifft(CArray& x) {
     // conjugate the complex numbers again
     x = x.apply(mxComplexSingleClass::conj);
 
-
     // scale the numbers
     x /= x.size();
+}
+
+int main(int argc, char **argv) {
+    const Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
+    CArray data(test, 8);
+
+    // forward fft
+    fft(data);
+
+    std::cout << "fft" << std::endl;
+    for (int i = 0; i < 8; ++i) {
+        std::cout << data[i] << std::endl;
+    }
+
+    // inverse fft
+    ifft(data);
+
+    std::cout << std::endl << "ifft" << std::endl;
+    for (int i = 0; i < 8; ++i) {
+        std::cout << data[i] << std::endl;
+    }
+    return EXIT_SUCCESS;
 }

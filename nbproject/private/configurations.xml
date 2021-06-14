@@ -31,6 +31,8 @@
           </df>
           <in>feature_tests.cxx</in>
         </df>
+        <df name="Matlab">
+        </df>
         <df name="matlab">
           <df name="mex">
             <df name="CMakeFiles">
@@ -38,6 +40,8 @@
             <df name="cpuBackProjection">
               <df name="CMakeFiles">
                 <df name="cpuBackProjection.dir">
+                </df>
+                <df name="cpuBackProjection_test.dir">
                 </df>
               </df>
             </df>
@@ -62,8 +66,6 @@
               </df>
             </df>
           </df>
-        </df>
-        <df name="Matlab">
         </df>
       </df>
       <df name="docs">
@@ -136,6 +138,8 @@
         <gdb_interceptlist>
           <gdbinterceptoptions gdb_all="false" gdb_unhandled="true" gdb_unexpected="true"/>
         </gdb_interceptlist>
+        <gdb_signals>
+        </gdb_signals>
         <gdb_options>
           <DebugOptions>
           </DebugOptions>

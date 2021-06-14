@@ -68,7 +68,7 @@
           <buildCommandWorkingDir>build</buildCommandWorkingDir>
           <buildCommand>${MAKE} -f Makefile</buildCommand>
           <cleanCommand>${MAKE} -f Makefile clean</cleanCommand>
-          <executablePath></executablePath>
+          <executablePath>build/bin/cpuBackProjection_test</executablePath>
         </makeTool>
         <preBuild>
           <preBuildCommandWorkingDir>build</preBuildCommandWorkingDir>
@@ -121,7 +121,7 @@
             <pElem>/usr/local/cuda/include/cuda_runtime.h</pElem>
           </incFile>
           <preprocessorList>
-            <Elem>MATLAB_DEFAULT_RELEASE=R2020a</Elem>
+            <Elem>MATLAB_DEFAULT_RELEASE=R2019b</Elem>
             <Elem>MATLAB_MEX_FILE</Elem>
             <Elem>MX_COMPAT_64</Elem>
             <Elem>USE_MEX_CMD</Elem>
@@ -182,7 +182,7 @@
             <pElem>/usr/local/cuda/bin/crt</pElem>
             <pElem>/usr/local/cuda/targets/x86_64-linux/include</pElem>
             <pElem>/tmp</pElem>
-            <pElem>build/matlab/mex/cudamex/cudaAdd</pElem>
+            <pElem>build/matlab/mex/mexcuda/cudaAdd</pElem>
           </incDir>
         </ccTool>
       </folder>
