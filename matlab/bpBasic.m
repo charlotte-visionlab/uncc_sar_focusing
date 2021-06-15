@@ -67,7 +67,7 @@ data.im_final = zeros(size(data.x_mat));
 t = zeros(1,data.Np);
 
 % Loop through every pulse
-for ii = 1:1%data.Np
+for ii = 1:data.Np
     
     % Display status of the imaging process
     if ii > 1 && mod(ii,100)==0
@@ -78,7 +78,7 @@ for ii = 1:1%data.Np
     tic
 
     % Form the range profile with zero padding added
-    rc1 = ifft(data.phdata(:,ii),data.Nfft);
+    %rc1 = ifft(data.phdata(:,ii),data.Nfft);
     rc = fftshift(ifft(data.phdata(:,ii),data.Nfft));
 
     % Calculate differential range for each pixel in the image (m)
@@ -91,13 +91,9 @@ for ii = 1:1%data.Np
 
     % Determine which pixels fall within the range swath
     I = find(and(dR > min(data.r_vec), dR < max(data.r_vec)));
-    if (ii==1)
-        phdata = data.phdata(:,ii)
-        rc1a = rc1
-        rca = rc
-    end
+    
     % Update the image using linear interpolation
-    data.im_final(I) = data.im_final(I) + interp1(data.r_vec,rc,dR(I),'linear') .* phCorr(I);
+    data.im_final(I) = data.im_final(I) + interp1(data.r_vec, rc, dR(I), 'linear') .* phCorr(I);
     
     % Determine the execution time for this pulse
     t(ii) = toc;

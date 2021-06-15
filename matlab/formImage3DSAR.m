@@ -36,8 +36,8 @@ taper_flag = 0;         % Add a hamming taper for sidelobe control
 data.Wx = 100;          % Scene extent x (m)
 data.Wy = 100;          % Scene extent y (m)
 data.Nfft = 424;        % Number of samples in FFT
-data.Nx = 501;          % Number of samples in x direction
-data.Ny = 501;          % Number of samples in y direction
+data.Nx = 256;          % Number of samples in x direction
+data.Ny = 256;          % Number of samples in y direction
 data.x0 = 0;            % Center of image scene in x direction (m)
 data.y0 = 0;            % Center of image scene in y direction (m)
 dyn_range = 70;         % dB of dynamic range to display
@@ -115,7 +115,9 @@ end
 
 % Setup imaging grid
 data.x_vec = linspace(data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.Nx);
+%data.x_vec(1:10)
 data.y_vec = linspace(data.y0 - data.Wy/2, data.y0 + data.Wy/2, data.Ny);
+%data.y_vec(1:10)
 [data.x_mat,data.y_mat] = meshgrid(data.x_vec,data.y_vec);
 data.z_mat = zeros(size(data.x_mat));
 
@@ -144,12 +146,15 @@ elseif (true)
     data.AntY = single(data.AntY);
     data.AntZ = single(data.AntZ);
     data.deltaF = single(data.deltaF);
-    bounds = single([data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.y0 - data.Wy/2, data.y0 + data.Wy/2]);
+    data.x0 = single(data.x0);
+    data.y0 = single(data.y0);
+    data.Wx = single(data.Wx);
+    data.Wy = single(data.Wy);
     data.Nfft = single(data.Nfft);
     %data.phdata(1:10,1:2)
     data = bpBasic(data);
-    data.im_final = cpuBackProjection(data.phdata, data.minF, data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny,  ...
-        data.Nfft, bounds(1), bounds(2), bounds(3), bounds(4));
+    data.im_final2 = cpuBackProjection(data.phdata, data.minF, data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny,  ...
+        data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
 else
     gpuDevice
     % to compile
@@ -173,16 +178,16 @@ else
         bounds(1), bounds(2), bounds(3), bounds(4));
 end
 % Display the image
-% figure
-% imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
-%     max(max(abs(data.im_final)))),[-dyn_range 0])
-% colormap gray
-% axis xy image;
-% set(gca,'XTick',-50:25:50,'YTick',-50:25:50);
-% h = xlabel('x (m)');
-% set(h,'FontSize',14,'FontWeight''Bold');
-% h = ylabel('y (m)');
-% set(h,'FontSize',14,'FontWeight','Bold');
-% colorbar
+figure
+imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
+    max(max(abs(data.im_final)))),[-dyn_range 0])
+colormap gray
+axis xy image;
+set(gca,'XTick',-50:25:50,'YTick',-50:25:50);
+h = xlabel('x (m)');
+set(h,'FontSize',14,'FontWeight''Bold');
+h = ylabel('y (m)');
+set(h,'FontSize',14,'FontWeight','Bold');
+colorbar
 % set(gca,'FontSize',14,'FontWeight','Bold');
 % print -deps2 /ssip2/lgorham/SPIE10/fig/3DsarBPA.eps

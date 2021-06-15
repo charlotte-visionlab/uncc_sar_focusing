@@ -56,7 +56,6 @@ public:
 
     template <typename _Tp>
     inline mxComplexSingleClass(const _Tp& _real) {
-        std::cout << "hereA " << std::endl;
         real = _real;
         imag = 0.0f;
     }
@@ -112,6 +111,13 @@ public:
         return z;
     }
 
+    template <typename _Tp>
+    inline mxComplexSingleClass operator*(const _Tp& rhs) {
+        mxComplexSingleClass z = *this;
+        z *= rhs;
+        return z;
+    }
+
     inline mxComplexSingleClass operator+(const mxComplexSingleClass& rhs) {
         mxComplexSingleClass z = *this;
         z += rhs;
@@ -122,6 +128,12 @@ public:
         mxComplexSingleClass z = *this;
         z -= rhs;
         return z;
+    }
+
+    inline mxComplexSingleClass operator=(const mxComplexSingle& other) {
+        real = other.real;
+        imag = other.imag;
+        return *this;
     }
 
     template <typename _Tp>
@@ -137,15 +149,15 @@ public:
         return *this;
     }
 
-    template <typename _Tp>
-    inline mxComplexSingleClass& operator+=(const _Tp& rhs) {
-        real += rhs;
-        return *this;
-    }
-
     inline mxComplexSingleClass& operator+=(const mxComplexSingleClass& rhs) {
         real += rhs.real;
         imag += rhs.imag;
+        return *this;
+    }
+
+    template <typename _Tp>
+    inline mxComplexSingleClass& operator+=(const _Tp& rhs) {
+        real += rhs;
         return *this;
     }
 
@@ -195,6 +207,93 @@ public:
     friend std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass &c);
     friend std::istream& operator>>(std::istream& input, const mxComplexSingleClass& c);
 };
+
+template<typename _Tp>
+inline mxComplexSingleClass operator+(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __x;
+    __r += __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator+(const mxComplexSingleClass& __x, const _Tp& __y) {
+    mxComplexSingleClass __r = __x;
+    __r += __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator+(const _Tp& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __y;
+    __r += __x;
+    return __r;
+}
+//@}
+//@{
+///  Return new complex value @a x minus @a y.
+
+template<typename _Tp>
+inline mxComplexSingleClass operator-(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __x;
+    __r -= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator-(const mxComplexSingleClass& __x, const _Tp& __y) {
+    mxComplexSingleClass __r = __x;
+    __r -= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator-(const _Tp& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r(__x, -__y.imag());
+    __r -= __y.real();
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator*(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __x;
+    __r *= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator*(const mxComplexSingleClass& __x, const _Tp& __y) {
+    mxComplexSingleClass __r = __x;
+    __r *= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator*(const _Tp& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __y;
+    __r *= __x;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator/(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __x;
+    __r /= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator/(const mxComplexSingleClass& __x, const _Tp& __y) {
+    mxComplexSingleClass __r = __x;
+    __r /= __y;
+    return __r;
+}
+
+template<typename _Tp>
+inline mxComplexSingleClass operator/(const _Tp& __x, const mxComplexSingleClass& __y) {
+    mxComplexSingleClass __r = __x;
+    __r /= __y;
+    return __r;
+}
 
 // Templates for constant expressions with ==
 
