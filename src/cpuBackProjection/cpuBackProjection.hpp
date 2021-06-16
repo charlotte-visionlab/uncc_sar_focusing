@@ -317,20 +317,17 @@ operator==(const _Tp& __x, const mxComplexSingleClass& __y) {
 // Templates for constant expressions with !=
 
 template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool
-operator!=(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
     return __x.real != __y.real || __x.imag != __y.imag;
 }
 
 template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool
-operator!=(const mxComplexSingleClass& __x, const _Tp& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const _Tp& __y) {
     return __x.real != __y || __x.imag != _Tp();
 }
 
 template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool
-operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
     return __x != __y.real || _Tp() != __y.imag;
 }
 
@@ -361,6 +358,7 @@ inline std::ostream& operator<<(std::ostream& output, const mxComplexSingleClass
 
 #define MAKERADIUS(xpixel,ypixel, xa,ya,za) sqrtf(CAREFUL_AMINUSB_SQ(xpixel, xa) + CAREFUL_AMINUSB_SQ(ypixel, ya) + __fmul_rn(za, za))
 
+//#define CLIGHT 299792458.0 /* c: speed of light, m/s */
 #define CLIGHT 299792458.0f /* c: speed of light, m/s */
 #define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
 

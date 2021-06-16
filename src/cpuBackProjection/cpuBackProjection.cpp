@@ -88,8 +88,8 @@ void computeDifferentialRangeAndPhaseCorrections(const float* xObs, const float*
         const float* range_to_phasectr, const int pulseIndex, const float* minF,
         const int Npulses, const int Nrangebins, const int Nx_pix, const int Ny_pix, const int Nfft,
         const float x0, const float y0, const float Wx, const float Wy,
-        const float* r_vec, const CArray& rangeCompressed, const float min_Rvec, const float max_Rvec,
-        std::vector<float>& dR_vec, std::vector<Complex>& phCorr_vec,
+        const float* r_vec, const CArray& rangeCompressed, 
+        const float min_Rvec, const float max_Rvec, const float maxWr,
         CArray& output_image);
 
 void convert_f0(float* vec, int N) {
@@ -231,24 +231,11 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     CArray range_profiles_arr(range_profiles_cast, Npulses * Nrangebins);
     //CArray range_profiles_arr(Npulses * Nrangebins);
     CArray output_image_arr(output_image_cast, Ny_pix * Nx_pix);
-//    for (int i = 0; i < Npulses * Nrangebins; i++) {
-//        //std::cout << "I(" << i << ") = " << output_image_arr[i] << std::endl;
-//        range_profiles_arr[i] = range_profiles[i];
-//    }
+    //    for (int i = 0; i < Npulses * Nrangebins; i++) {
+    //        //std::cout << "I(" << i << ") = " << output_image_arr[i] << std::endl;
+    //        range_profiles_arr[i] = range_profiles[i];
+    //    }
 
-    /*
-        std::cout << "size = " << range_profiles_arr.size() << std::endl;
-        int ii;
-        for (int pulseIndex = 0; pulseIndex < 2; pulseIndex++) {
-            CArray phaseData = range_profiles_arr[std::slice(pulseIndex*Nfft, (pulseIndex + 1) * Nfft, 1)];
-            ii = 0;
-            for (auto phaseSample : phaseData) {
-                std::cout << "ph " << phaseSample << std::endl;
-                if (++ii == 10)
-                    break;
-            }
-        }
-     */
     run_bp(range_profiles_arr, xobs, yobs, zobs,
             aimpoint_ranges,
             Npulses, Nrangebins, Nx_pix, Ny_pix, Nfft,
@@ -346,7 +333,8 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
     float meanMinF = 0.0f;
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
         // TODO: we are not unwrapping the phase here
-        AntAz[pulseIndex] = std::atan2(yObs[pulseIndex], xObs[pulseIndex]); //unwrap(atan2(data.AntY,data.AntX));
+        //unwrap(atan2(data.AntY,data.AntX));
+        AntAz[pulseIndex] = std::atan2(yObs[pulseIndex], xObs[pulseIndex]); 
         if (pulseIndex > 0) {
             deltaAz[pulseIndex - 1] = AntAz[pulseIndex] - AntAz[pulseIndex - 1];
             meanDeltaAz += std::abs(deltaAz[pulseIndex - 1]);
@@ -367,15 +355,15 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         data.maxWr = c/(2*data.deltaF);   
         data.maxWx = c/(2*data.deltaAz*mean(data.minF));
      */
-    float maxWr = CLIGHT / (2.0f * deltaF[0]);
-    float maxWx = CLIGHT / (2.0f * meanDeltaAz * meanMinF);
+    float maxWr = (float) (CLIGHT / (2.0 * (double) deltaF[0]));
+    float maxWx = (float) (CLIGHT / (2.0 * meanDeltaAz * meanMinF));
     /*
         % Determine the resolution of the image (m)
         data.dr = c/(2*data.deltaF*data.K);
         data.dx = c/(2*data.totalAz*mean(data.minF));
      */
-    float dr = CLIGHT / (2.0f * deltaF[0] * Nrangebins);
-    float dx = CLIGHT / (2.0f * deltaF[0] * Nrangebins);
+    float dr = (float) (CLIGHT / (2.0f * deltaF[0] * Nrangebins));
+    float dx = (float) (CLIGHT / (2.0f * totalAz * meanMinF));
     /*
     % Display maximum scene size and resolution
      */
@@ -385,12 +373,18 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
      */
+// idx should be integer    
+#define RANGE_INDEX_TO_RANGE_VALUE(idx, maxWr, N) ((float) idx / N - 0.5f) * maxWr
+// val should be float
+#define RANGE_VALUE_TO_RANGE_INDEX(val, maxWr, N) (val / maxWr + 0.5f) * N
+
     float r_vec[Nfft];
     float min_Rvec = std::numeric_limits<float>::infinity();
     float max_Rvec = -std::numeric_limits<float>::infinity();
     for (int rIdx = 0; rIdx < Nfft; rIdx++) {
         // -maxWr/2:maxWr/Nfft:maxWr/2
-        float rVal = ((float) rIdx / Nfft - 0.5f) * maxWr;
+        //float rVal = ((float) rIdx / Nfft - 0.5f) * maxWr;
+        float rVal = RANGE_INDEX_TO_RANGE_VALUE(rIdx, maxWr, Nfft);
         r_vec[rIdx] = rVal;
         if (min_Rvec > r_vec[rIdx]) {
             min_Rvec = r_vec[rIdx];
@@ -400,116 +394,44 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         }
     }
 
-    /*
-         % Initialize the image with all zero values
-        data.im_final = zeros(size(data.x_mat));
-        % Set up a vector to keep execution times for each pulse (sec)
-        t = zeros(1,data.Np);
-    % Loop through every pulse
-    for ii = 1:data.Np
-    
-        % Display status of the imaging process
-        if ii > 1 && mod(ii,100)==0
-            t_sofar = sum(t(1:(ii-1)));
-            t_est = (t_sofar*data.Np/(ii-1)-t_sofar)/60;
-            fprintf('Pulse %d of %d, %.02f minutes remaining\n',ii,data.Np,t_est);
-        end
-        tic
-
-        % Form the range profile with zero padding added
-        rc = fftshift(ifft(data.phdata(:,ii),data.Nfft));
-
-        % Calculate differential range for each pixel in the image (m)
-        dR = sqrt((data.AntX(ii)-data.x_mat).^2 + ...
-            (data.AntY(ii)-data.y_mat).^2 + ...
-            (data.AntZ(ii)-data.z_mat).^2) - data.R0(ii);
-
-        % Calculate phase correction for image
-        phCorr = exp(1i*4*pi*data.minF(ii)*dR/c);
-
-        % Determine which pixels fall within the range swath
-        I = find(and(dR > min(data.r_vec), dR < max(data.r_vec)));
-
-        % Update the image using linear interpolation
-        data.im_final(I) = data.im_final(I) + interp1(data.r_vec,rc,dR(I),'linear') .* phCorr(I);
-    
-        % Determine the execution time for this pulse
-        t(ii) = toc;
-    end
-     */
-    std::vector<float> dR_vec;
-    std::vector<Complex> phCorr_vec;
-    int ii;
-    ii = 0;
-    //    for (auto rvecSamp : r_vec) {
-    //        std::cout << "r_vec " << rvecSamp << std::endl;
-    //        if (++ii == 10)
-    //            break;
-    //    }
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
+        if (pulseIndex > 1 && (pulseIndex % 100) == 0) {
+            printf("Pulse %d of %d, %.02f minutes remaining\n", pulseIndex, Npulses, 0.0f);
+        }
+
         CArray phaseData = phd[std::slice(pulseIndex * Nfft, Nfft, 1)];
 
-        //        if (pulseIndex > -1) {
-        //            ii = 0;
-        //            for (auto phaseSample : phaseData) {
-        //                std::cout << "ph[" << ii++ << "] = " << phaseSample << std::endl;
-        //                //                                if (++ii == 1)
-        //                //                                    break;
-        //            }
-        //        }
         //ifft(phaseData);
         ifftw(phaseData);
-        //        if (pulseIndex == 1) {
-        //            ii = 0;
-        //            for (auto phaseSample : phaseData) {
-        //                std::cout << "ifft " << phaseSample << std::endl;
-        //                if (++ii == 10)
-        //                    break;
-        //            }
-        //        }
 
         CArray rangeCompressed = fftshift(phaseData);
-        //        if (pulseIndex == 1) {
-        //            ii = 0;
-        //            for (auto range : rangeCompressed) {
-        //                std::cout << "rc " << range << std::endl;
-        //                if (++ii == 10)
-        //                    break;
-        //            }
-        //        }
 
         computeDifferentialRangeAndPhaseCorrections(xObs, yObs, zObs,
                 r, pulseIndex, minF,
                 Npulses, Nrangebins, Nx_pix, Ny_pix, Nfft,
                 x0, y0, Wx, Wy,
-                r_vec, rangeCompressed, min_Rvec, max_Rvec,
-                dR_vec, phCorr_vec, output_image);
+                r_vec, rangeCompressed, min_Rvec, max_Rvec, maxWr,
+                output_image);
 
-        /*
-                CArray validRanges = rangeCompressed[rangeSlices[pulseIndex]];
-                if (pulseIndex == 0) {
-                    ii = 0;
-                    for (auto vrange : validRanges) {
-                        std::cout << "dR " << vrange << std::endl;
-                        if (++ii == 10)
-                            break;
-                    }
-                }
-         */
-        // Vq = interp1(X,V,Xq) interpolates to find Vq, the values of the
-        // underlying function V=F(X) at the query points Xq.
     }
     //free(platform);
 }
 
-Complex interp1(const float* xSampleLocations, const int nSamples, const CArray& sampleValues, const float xInterpLocation) {
+// Vq = interp1(X,V,Xq) interpolates to find Vq, the value of the
+// underlying function Vq=f(Xq) at the query points Xq given
+// measurements of the function at X=f(V).
+
+Complex interp1(const float* xSampleLocations, const int nSamples, const CArray& sampleValues, const float xInterpLocation, const float xIndex) {
     Complex iVal(0, 0);
-    int rightIdx = 0;
-    while (++rightIdx < nSamples && xSampleLocations[rightIdx] <= xInterpLocation);
+    int rightIdx = std::floor(xIndex);
+    while (++rightIdx < nSamples && xSampleLocations[rightIdx] <= xInterpLocation);    
     if (rightIdx == nSamples || rightIdx == 0) {
         std::cout << "Error::Invalid interpolation range." << std::endl;
         return iVal;
     }
+    //if (rightIdx < (int) std::floor(xIndex)) {
+    //    std::cout << "Error incorrect predicted location for dR. rightIdx = " << rightIdx << " dR_Idx= " << std::ceil(xIndex) << std::endl;
+    //}
     float alpha = (xInterpLocation - xSampleLocations[rightIdx - 1]) / (xSampleLocations[rightIdx] - xSampleLocations[rightIdx - 1]);
     iVal = alpha * sampleValues[rightIdx] + (1.0f - alpha) * sampleValues[rightIdx - 1];
     return iVal;
@@ -519,32 +441,28 @@ void computeDifferentialRangeAndPhaseCorrections(const float* xObs, const float*
         const float* range_to_phasectr, const int pulseIndex, const float* minF,
         const int Npulses, const int Nrangebins, const int Nx_pix, const int Ny_pix, int Nfft,
         const float x0, const float y0, const float Wx, const float Wy,
-        const float* r_vec, const CArray& rangeCompressed, const float min_Rvec, const float max_Rvec,
-        std::vector<float>& dR_vec, std::vector<Complex>& phCorr_vec,
+        const float* r_vec, const CArray& rangeCompressed, 
+        const float min_Rvec, const float max_Rvec, const float maxWr,
         CArray& output_image) {
     float4 target;
     target.x = x0 - (Wx / 2);
     target.z = 0;
     float delta_x = Wx / (Nx_pix - 1);
     float delta_y = Wy / (Ny_pix - 1);
-    //int rvecIdx_start, rvecIdx_end;
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
     for (int xIdx = 0; xIdx < Nx_pix; xIdx++) {
         target.y = y0 - (Wy / 2);
-        //rvecIdx_start = -1;
-        //rvecIdx_end = -1;
         for (int yIdx = 0; yIdx < Ny_pix; yIdx++) {
             float dR_val = std::sqrt((xObs[pulseIndex] - target.x) * (xObs[pulseIndex] - target.x) +
                     (yObs[pulseIndex] - target.y) * (yObs[pulseIndex] - target.y) +
                     (zObs[pulseIndex] - target.z) * (zObs[pulseIndex] - target.z)) - range_to_phasectr[pulseIndex];
             //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
             if (dR_val > min_Rvec && dR_val < max_Rvec) {
-                Complex phCorr_val = polarToComplex(1.0f, (4.0f * PI * minF[pulseIndex] * dR_val) / CLIGHT);
-                //dR_vec.push_back(dR_val);
-                //phCorr_vec.push_back(phCorr_val);
+                Complex phCorr_val = polarToComplex(1.0f, (float) ((4.0 * PI * minF[pulseIndex] * dR_val) / CLIGHT));
                 //std::cout << "idx = " << (xIdx * Ny_pix + yIdx) << " (x,y)=(" << target.x << "," << target.y << ")"
                 //        << "(dR,phCorr)=(" << dR_val << ", " << phCorr_val << ")" << std::endl;
-                Complex iRC_val = interp1(r_vec, Nfft, rangeCompressed, dR_val);
+                float dR_idx = RANGE_VALUE_TO_RANGE_INDEX(dR_val, maxWr, Nfft);
+                Complex iRC_val = interp1(r_vec, Nfft, rangeCompressed, dR_val, dR_idx);
                 int outputIdx = xIdx * Ny_pix + yIdx;
                 //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
                 output_image[xIdx * Ny_pix + yIdx] += iRC_val * phCorr_val;

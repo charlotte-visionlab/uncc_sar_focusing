@@ -20,7 +20,7 @@ clear all; close all; clc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % INPUT PARAMETERS START HERE %
-addpath('../build/bin');
+addpath('../build/lib');
 % Define the path to the base directory of the dataset
 dvdPath = '../../../sar/GOTCHA/Gotcha-CP-All';
 
@@ -36,10 +36,10 @@ taper_flag = 0;         % Add a hamming taper for sidelobe control
 data.Wx = 100;          % Scene extent x (m)
 data.Wy = 100;          % Scene extent y (m)
 data.Nfft = 424;        % Number of samples in FFT
-data.Nx = 256;          % Number of samples in x direction
-data.Ny = 256;          % Number of samples in y direction
-data.x0 = 0;            % Center of image scene in x direction (m)
-data.y0 = 0;            % Center of image scene in y direction (m)
+data.Nx = 500;          % Number of samples in x direction
+data.Ny = 500;          % Number of samples in y direction
+data.x0 = 10;            % Center of image scene in x direction (m)
+data.y0 = -10;            % Center of image scene in y direction (m)
 dyn_range = 70;         % dB of dynamic range to display
 
 % INPUT PARAMETERS END HERE %
@@ -119,7 +119,9 @@ data.x_vec = linspace(data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.Nx);
 data.y_vec = linspace(data.y0 - data.Wy/2, data.y0 + data.Wy/2, data.Ny);
 %data.y_vec(1:10)
 [data.x_mat,data.y_mat] = meshgrid(data.x_vec,data.y_vec);
-data.z_mat = zeros(size(data.x_mat));
+data.x_mat = single(data.x_mat);
+data.y_mat = single(data.y_mat);
+data.z_mat = zeros(size(data.x_mat),'single');
 
 if (false)
     % Call the backprojection function with the appropriate inputs
@@ -138,23 +140,26 @@ elseif (true)
     data.z_vec = zeros(1,length(data.x_vec));
     data.phdata = single(data.phdata);
     data.minF = single(data.minF);
+    data.deltaF = single(data.deltaF);
     data.R0 = single(data.R0);
-    data.x_vec = single(data.x_vec);
-    data.y_vec = single(data.y_vec);
-    data.z_vec = single(data.z_vec);
     data.AntX = single(data.AntX);
     data.AntY = single(data.AntY);
     data.AntZ = single(data.AntZ);
-    data.deltaF = single(data.deltaF);
+    %data.Nfft = single(data.Nfft);
+    data.x_vec = single(data.x_vec);
+    data.y_vec = single(data.y_vec);
+    data.z_vec = single(data.z_vec);
     data.x0 = single(data.x0);
     data.y0 = single(data.y0);
     data.Wx = single(data.Wx);
     data.Wy = single(data.Wy);
-    data.Nfft = single(data.Nfft);
     %data.phdata(1:10,1:2)
     data = bpBasic(data);
+    
+    %profile on;
     data.im_final2 = cpuBackProjection(data.phdata, data.minF, data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny,  ...
         data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
+    %profile viewer;
 else
     gpuDevice
     % to compile
@@ -179,15 +184,32 @@ else
 end
 % Display the image
 figure
-imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
-    max(max(abs(data.im_final)))),[-dyn_range 0])
-colormap gray
-axis xy image;
-set(gca,'XTick',-50:25:50,'YTick',-50:25:50);
+subplot(1,3,1), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
+    max(max(abs(data.im_final)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab BP');
+%set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
+%    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
 h = xlabel('x (m)');
-set(h,'FontSize',14,'FontWeight''Bold');
+%set(h,'FontSize',14,'FontWeight''Bold');
 h = ylabel('y (m)');
-set(h,'FontSize',14,'FontWeight','Bold');
+%set(h,'FontSize',14,'FontWeight','Bold');
+colorbar
+subplot(1,3,2), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
+    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('CPU BP');
+%set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
+%    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
+h = xlabel('x (m)');
+%set(h,'FontSize',14,'FontWeight''Bold');
+h = ylabel('y (m)');
+%set(h,'FontSize',14,'FontWeight','Bold');
+colorbar
+subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)./...
+    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab-CPU Difference');
+%set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
+%    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
+h = xlabel('x (m)');
+%set(h,'FontSize',14,'FontWeight''Bold');
+h = ylabel('y (m)');
+%set(h,'FontSize',14,'FontWeight','Bold');
 colorbar
 % set(gca,'FontSize',14,'FontWeight','Bold');
 % print -deps2 /ssip2/lgorham/SPIE10/fig/3DsarBPA.eps

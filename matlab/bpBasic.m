@@ -30,7 +30,7 @@ function data = bpBasic(data)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define speed of light (m/s)
-c = 299792458;
+c = single(299792458);
 
 % Determine the size of the phase history data
 data.K = size(data.phdata,1);  % The number of frequency bins per pulse
@@ -61,7 +61,7 @@ fprintf('Resolution:  %.2fm range, %.2f m cross-range\n',data.dr,data.dx);
 data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
 
 % Initialize the image with all zero values
-data.im_final = zeros(size(data.x_mat));
+data.im_final = zeros(size(data.x_mat),'single');
 
 % Set up a vector to keep execution times for each pulse (sec)
 t = zeros(1,data.Np);
