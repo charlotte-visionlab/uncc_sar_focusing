@@ -1,6 +1,8 @@
-set( CMAKE_VERBOSE_MAKEFILE ON)
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 project(cpuBackProjection LANGUAGES CXX)
+
+set( CMAKE_VERBOSE_MAKEFILE ON)
 
 find_package(FFTW REQUIRED)
 
@@ -39,6 +41,4 @@ else(WIN32)
     endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
 endif(WIN32)
 
-# install to /bin by default
-#install(TARGETS ${CU_FILE} DESTINATION ../bin)
 

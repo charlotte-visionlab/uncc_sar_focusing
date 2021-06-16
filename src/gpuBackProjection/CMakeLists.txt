@@ -1,4 +1,3 @@
-project(mexcuda LANGUAGES CXX CUDA)
 
 set( CUDA_ARCH_FLAGS "-gencode=arch=compute_35,code=sm_35 \
 -gencode=arch=compute_50,code=sm_50 \
