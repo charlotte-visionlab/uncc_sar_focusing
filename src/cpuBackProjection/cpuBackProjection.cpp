@@ -1,7 +1,17 @@
 
-#include <stdio.h>  // printf 
+#include <iomanip>
+#include <iostream>
 #include <limits>   // std::numeric_limits
+#include <numeric>
+#include <sstream>
+#include <string>
+#include <unordered_map>
+
+#include <stdio.h>  // printf 
 #include <time.h>
+
+#include <cxxopts.hpp>
+#include <matio.h>
 
 #include "cpuBackProjection.hpp"
 
@@ -77,7 +87,7 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
         // TODO: we are not unwrapping the phase here
         //unwrap(atan2(data.AntY,data.AntX));
-        AntAz[pulseIndex] = std::atan2(yObs[pulseIndex], xObs[pulseIndex]); 
+        AntAz[pulseIndex] = std::atan2(yObs[pulseIndex], xObs[pulseIndex]);
         if (pulseIndex > 0) {
             deltaAz[pulseIndex - 1] = AntAz[pulseIndex] - AntAz[pulseIndex - 1];
             meanDeltaAz += std::abs(deltaAz[pulseIndex - 1]);
@@ -116,9 +126,9 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
      */
-// idx should be integer    
+    // idx should be integer    
 #define RANGE_INDEX_TO_RANGE_VALUE(idx, maxWr, N) ((float) idx / N - 0.5f) * maxWr
-// val should be float
+    // val should be float
 #define RANGE_VALUE_TO_RANGE_INDEX(val, maxWr, N) (val / maxWr + 0.5f) * N
 
     float r_vec[Nfft];
@@ -166,7 +176,7 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
 Complex interp1(const float* xSampleLocations, const int nSamples, const CArray& sampleValues, const float xInterpLocation, const float xIndex) {
     Complex iVal(0, 0);
     int rightIdx = std::floor(xIndex);
-    while (++rightIdx < nSamples && xSampleLocations[rightIdx] <= xInterpLocation);    
+    while (++rightIdx < nSamples && xSampleLocations[rightIdx] <= xInterpLocation);
     if (rightIdx == nSamples || rightIdx == 0) {
         std::cout << "Error::Invalid interpolation range." << std::endl;
         return iVal;
@@ -183,7 +193,7 @@ void computeDifferentialRangeAndPhaseCorrections(const float* xObs, const float*
         const float* range_to_phasectr, const int pulseIndex, const float* minF,
         const int Npulses, const int Nrangebins, const int Nx_pix, const int Ny_pix, int Nfft,
         const float x0, const float y0, const float Wx, const float Wy,
-        const float* r_vec, const CArray& rangeCompressed, 
+        const float* r_vec, const CArray& rangeCompressed,
         const float min_Rvec, const float max_Rvec, const float maxWr,
         CArray& output_image) {
     float4 target;
@@ -215,11 +225,164 @@ void computeDifferentialRangeAndPhaseCorrections(const float* xObs, const float*
     }
 }
 
+// For details see: https://github.com/jarro2783/cxxopts
+
+void cxxopts_integration(cxxopts::Options& options) {
+
+    options.add_options()
+            ("i,input", "Input file", cxxopts::value<std::string>())
+            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
+            ("o,output", "Output file", cxxopts::value<std::string>())
+            ("h,help", "Print usage")
+            ;
+}
+
+std::string HARDCODED_SARDATA_PATH = "/home/arwillis/sar/";
+
+std::string Sandia_RioGrande_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Rio_Grande_UUR_SAND2021-1834_O/SPH/PHX1T03_PS0008_PT0000";
+// index here is 2 digit file index [00,...,10]
+std::string Sandia_RioGrande_filepostfix = "";
+std::string Sandia_Farms_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Farms_UUR_SAND2021-1835_O/SPH/0506P19_PS0020_PT0000";
+// index here is 2 digit file index [00,...,09]
+std::string Sandia_Farms_filepostfix = "_N03_M1";
+
+// azimuth=[1,...,360] for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/DATA/pass1/HH/data_3dsar_pass1_az";
+// index here is 3 digit azimuth [001,...,360]
+std::string GOTCHA_filepostfix = "_HH";
+
+bool allocMATData(matvar_t *matvar) {
+    switch (matvar->class_type) {
+        case MAT_C_DOUBLE:
+        case MAT_C_SINGLE:
+        case MAT_C_INT64:
+        case MAT_C_UINT64:
+        case MAT_C_INT32:
+        case MAT_C_UINT32:
+        case MAT_C_INT16:
+        case MAT_C_UINT16:
+        case MAT_C_INT8:
+        case MAT_C_UINT8:
+            break;
+        default:
+            return MATIO_E_OPERATION_NOT_SUPPORTED;
+    }
+}
+
+#define VARPATH(stringvec) std::accumulate(stringvec.begin(), stringvec.end(), std::string(""))
+
+bool read_MAT_Struct(matvar_t * struct_matVar, std::unordered_map<std::string, matvar_t*> &matlab_readvar_map, std::vector<std::string>& context) {
+    context.push_back(".");
+    unsigned nFields = Mat_VarGetNumberOfFields(struct_matVar);
+    for (int fieldIdx = 0; fieldIdx < nFields; fieldIdx++) {
+        matvar_t* struct_fieldVar = Mat_VarGetStructFieldByIndex(struct_matVar, fieldIdx, 0);
+        if (struct_fieldVar != NULL) {
+            std::string varName(struct_fieldVar->name);
+            if (struct_fieldVar->data_type == matio_types::MAT_T_STRUCT) {
+                context.push_back(varName);
+                read_MAT_Struct(struct_fieldVar, matlab_readvar_map, context);
+                context.pop_back();
+            } else {
+                std::cout << VARPATH(context) + varName << std::endl;
+            }
+        }
+    }
+    context.pop_back();
+    return true;
+}
+
+bool read_MAT_Variables(std::string inputfile, std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
+    mat_t *matfp = Mat_Open(inputfile.c_str(), MAT_ACC_RDONLY);
+    std::vector<std::string> context;
+    if (matfp) {
+        matvar_t* root_matVar;
+        while ((root_matVar = Mat_VarReadNext(matfp)) != NULL) {
+            std::string varName(root_matVar->name);
+            if (root_matVar->data_type == matio_types::MAT_T_STRUCT) {
+                context.push_back(varName);
+                read_MAT_Struct(root_matVar, matlab_readvar_map, context);
+            } else if (root_matVar->data_type == matio_types::MAT_T_CELL) {
+                std::cout << VARPATH(context) + varName << "is data of type MAT_T_CELL and cannot be read." << std::endl;
+            } else {
+                std::cout << VARPATH(context) + varName << " reading data..." << std::endl;
+                int read_err = Mat_VarReadDataAll(matfp, root_matVar);
+                if (read_err) {
+                    //fprintf(stderr,"Error reading data for 'ing{%lu}.%s'\n",ing_index,ing_fieldname);
+                    //err = EXIT_FAILURE;
+                } else {
+                    Mat_VarPrint(root_matVar, 1);
+                }
+            }
+            Mat_VarFree(root_matVar);
+            root_matVar = NULL;
+        }
+        Mat_Close(matfp);
+    } else {
+        std::cout << "Could not open MATLAB file " << inputfile << "." << std::endl;
+        return false;
+    }
+    return true;
+}
+
 int main(int argc, char **argv) {
     Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
     Complex out[8];
     CArray data(test, 8);
 
+    cxxopts::Options options("cpuBackProjection", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
+    cxxopts_integration(options);
+
+    auto result = options.parse(argc, argv);
+
+    if (result.count("help")) {
+        std::cout << options.help() << std::endl;
+        exit(0);
+    }
+    bool debug = result["debug"].as<bool>();
+    std::string inputfile;
+    if (result.count("input")) {
+        inputfile = result["input"].as<std::string>();
+    } else {
+
+        // Sandia SAR DATA FILE LOADING
+        //int idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        //std::string fileprefix = Sandia_RioGrande_fileprefix;
+        //std::string filepostfix = Sandia_RioGrande_filepostfix;
+        //std::string fileprefix = Sandia_Farms_fileprefix;
+        //std::string filepostfix = Sandia_Farms_filepostfix;
+        //ss << std::setfill('0') << std::setw(2) << idx;
+
+        // GOTCHA SAR DATA FILE LOADING
+        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+        std::string fileprefix = GOTCHA_fileprefix;
+        std::string filepostfix = GOTCHA_filepostfix;
+        std::stringstream ss;
+        ss << std::setfill('0') << std::setw(3) << azimuth;
+        inputfile = fileprefix + ss.str() + filepostfix + ".mat";
+    }
+
+    std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
+    std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
+    matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
+    matlab_readvar_map["sph_MATData.preamble"] = NULL;
+    matlab_readvar_map["sph_MATData.Const"] = NULL;
+    matlab_readvar_map["sph_MATData.Data"] = NULL;
+
+    matlab_readvar_map["data.fp"] = NULL;
+    matlab_readvar_map["data.freq"] = NULL;
+    matlab_readvar_map["data.x"] = NULL;
+    matlab_readvar_map["data.y"] = NULL;
+    matlab_readvar_map["data.z"] = NULL;
+    matlab_readvar_map["data.r0"] = NULL;
+    matlab_readvar_map["data.th"] = NULL;
+    matlab_readvar_map["data.phi"] = NULL;
+    matlab_readvar_map["data.af.r_correct"] = NULL;
+    matlab_readvar_map["data.af.ph_correct"] = NULL;
+
+    if (!read_MAT_Variables(inputfile, matlab_readvar_map)) {
+        std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
+        return EXIT_FAILURE;
+    }
     // forward fft
     //fft(data);
     fftw(data);

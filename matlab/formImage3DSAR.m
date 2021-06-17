@@ -156,9 +156,9 @@ elseif (true)
     %data.phdata(1:10,1:2)
     data = bpBasic(data);
     
-    %profile on;
-    data.im_final2 = cpuBackProjection(data.phdata, data.minF, data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny,  ...
-        data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
+    data.im_final2 = cpuBackProjection(data.phdata, data.minF, ...
+        data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, ...
+        data.Nx, data.Ny, data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
     %profile viewer;
 else
     gpuDevice

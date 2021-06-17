@@ -9,8 +9,10 @@ find_package(FFTW REQUIRED)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -DMATLAB_MEX_FILE -g -O0")
 
 include_directories(
+    ../include
     ${Matlab_INCLUDE_DIRS}
     ${FFTW_INCLUDE_DIRS}
+#    ${MATIO_INCLUDE_DIRS}
 )
 
 add_library(${PROJECT_NAME} SHARED 
@@ -23,7 +25,7 @@ target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES})# ${FFTW_FLOAT_LIB})
 add_executable(cpuBackProjection_test
     cpuBackProjection_fft.cpp
     cpuBackProjection.cpp)
-target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB})# ${FFTW_LIBRARIES})
+target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} matio)# ${FFTW_LIBRARIES})
 set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 # 32-bit or 64-bit mex
