@@ -311,39 +311,35 @@ inline mxComplexSingleClass operator/(const _Tp& __x, const mxComplexSingleClass
 
 // Templates for constant expressions with ==
 
-inline _GLIBCXX_CONSTEXPR bool
-operator==(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator==(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
     return __x.real == __y.real && __x.imag == __y.imag;
 }
 
 template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool
-operator==(const mxComplexSingleClass& __x, const _Tp& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator==(const mxComplexSingleClass& __x, const _Tp& __y) {
     return __x.real == __y && __x.imag == _Tp();
 }
 
 template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool
-operator==(const _Tp& __x, const mxComplexSingleClass& __y) {
+inline _GLIBCXX_CONSTEXPR bool operator==(const _Tp& __x, const mxComplexSingleClass& __y) {
     return __x == __y.real && _Tp() == __y.imag;
 }
 
 // Templates for constant expressions with !=
 
-template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
-    return __x.real != __y.real || __x.imag != __y.imag;
-}
-
-template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const _Tp& __y) {
-    return __x.real != __y || __x.imag != _Tp();
-}
-
-template<typename _Tp>
-inline _GLIBCXX_CONSTEXPR bool operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
-    return __x != __y.real || _Tp() != __y.imag;
-}
+//template<typename _Tp>
+//inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const mxComplexSingleClass& __y) {
+//    return __x.real != __y.real || __x.imag != __y.imag;
+//}
+//
+//template<typename _Tp>
+//inline _GLIBCXX_CONSTEXPR bool operator!=(const mxComplexSingleClass& __x, const _Tp& __y) {
+//    return __x.real != __y || __x.imag != _Tp();
+//}
+//template<typename _Tp>
+//inline _GLIBCXX_CONSTEXPR bool operator!=(const _Tp& __x, const mxComplexSingleClass& __y) {
+//    return __x != __y.real || _Tp() != __y.imag;
+//}
 
 // std::cout << "Enter a complex number (a+bi) : " << std::endl;
 // std::cin >> x;

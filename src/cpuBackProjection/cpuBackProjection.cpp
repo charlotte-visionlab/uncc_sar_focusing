@@ -253,10 +253,21 @@ std::string GOTCHA_filepostfix = "_HH";
 
 void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
     matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
-    matlab_readvar_map["sph_MATData.preamble"] = NULL;
-    matlab_readvar_map["sph_MATData.Const"] = NULL;
-    matlab_readvar_map["sph_MATData.Data"] = NULL;
-
+    matlab_readvar_map["sph_MATData.preamble.ADF"] = NULL;
+    //matlab_readvar_map["sph_MATData.Const"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.ChirpRate"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.ChirpRateDelta"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.SampleData"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.StartF"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.x"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.y"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.z"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
     // data.phdata = sphObj.Data.SampleData(:,:,channelIndex);
     // % 1 = HH, 2 = HV, 3 = VH, 4 = VV
     // data.vfreq = zeros(numSamples, numPulses);
@@ -308,27 +319,9 @@ void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*> &matla
     matlab_readvar_map["data.af.ph_correct"] = NULL;
 }
 
-bool allocMATData(matvar_t *matvar) {
-    switch (matvar->class_type) {
-        case MAT_C_DOUBLE:
-        case MAT_C_SINGLE:
-        case MAT_C_INT64:
-        case MAT_C_UINT64:
-        case MAT_C_INT32:
-        case MAT_C_UINT32:
-        case MAT_C_INT16:
-        case MAT_C_UINT16:
-        case MAT_C_INT8:
-        case MAT_C_UINT8:
-            break;
-        default:
-            return MATIO_E_OPERATION_NOT_SUPPORTED;
-    }
-}
-
 #define VARPATH(stringvec) std::accumulate(stringvec.begin(), stringvec.end(), std::string(""))
 
-bool read_MAT_Struct(matvar_t * struct_matVar, std::unordered_map<std::string, matvar_t*> &matlab_readvar_map, std::vector<std::string>& context) {
+bool read_MAT_Struct(mat_t* matfp, matvar_t * struct_matVar, std::unordered_map<std::string, matvar_t*> &matlab_readvar_map, std::vector<std::string>& context) {
     context.push_back(".");
     unsigned nFields = Mat_VarGetNumberOfFields(struct_matVar);
     for (int fieldIdx = 0; fieldIdx < nFields; fieldIdx++) {
@@ -337,10 +330,27 @@ bool read_MAT_Struct(matvar_t * struct_matVar, std::unordered_map<std::string, m
             std::string varName(struct_fieldVar->name);
             if (struct_fieldVar->data_type == matio_types::MAT_T_STRUCT) {
                 context.push_back(varName);
-                read_MAT_Struct(struct_fieldVar, matlab_readvar_map, context);
+                read_MAT_Struct(matfp, struct_fieldVar, matlab_readvar_map, context);
                 context.pop_back();
             } else {
-                std::cout << VARPATH(context) + varName << std::endl;
+                std::string current_fieldname = VARPATH(context) + varName;
+                std::cout << current_fieldname << std::endl;
+                for (std::unordered_map<std::string, matvar_t*>::iterator it = matlab_readvar_map.begin();
+                        it != matlab_readvar_map.end(); ++it) {
+                    std::string searched_fieldname = it->first;
+                    //matvar_t *searched_matvar = it->second;
+                    if (searched_fieldname == current_fieldname) {
+                        std::cout << "Reading " << current_fieldname << " from file..." << std::endl;
+                        int read_err = Mat_VarReadDataAll(matfp, struct_fieldVar);
+                        if (read_err) {
+                            std::cout << "Error reading data for variable " << current_fieldname << ". Exiting read process." << std::endl;
+                            return false;
+                        } else {
+                            matlab_readvar_map[searched_fieldname] = struct_fieldVar;
+                            Mat_VarPrint(struct_fieldVar, 1);
+                        }
+                    }
+                }
             }
         }
     }
@@ -352,12 +362,26 @@ bool read_MAT_Variables(std::string inputfile, std::unordered_map<std::string, m
     mat_t *matfp = Mat_Open(inputfile.c_str(), MAT_ACC_RDONLY);
     std::vector<std::string> context;
     if (matfp) {
+
+        matvar_t* matvar = Mat_VarReadInfo(matfp, "data.fp");
+        if (NULL == matvar) {
+            fprintf(stderr, "Variable ’data.fp’ not found, or error "
+                    "reading MAT file\n");
+        } else {
+            if (!matvar->isComplex)
+                fprintf(stderr, "Variable ’data.fp’ is not complex!\n");
+            if (matvar->rank != 2 ||
+                    (matvar->dims[0] > 1 && matvar->dims[1] > 1))
+                fprintf(stderr, "Variable ’data.fp’ is not a vector!\n");
+            Mat_VarFree(matvar);
+        }
+
         matvar_t* root_matVar;
         while ((root_matVar = Mat_VarReadNext(matfp)) != NULL) {
             std::string varName(root_matVar->name);
             if (root_matVar->data_type == matio_types::MAT_T_STRUCT) {
                 context.push_back(varName);
-                read_MAT_Struct(root_matVar, matlab_readvar_map, context);
+                read_MAT_Struct(matfp, root_matVar, matlab_readvar_map, context);
             } else if (root_matVar->data_type == matio_types::MAT_T_CELL) {
                 std::cout << VARPATH(context) + varName << "is data of type MAT_T_CELL and cannot be read." << std::endl;
             } else {
@@ -401,24 +425,25 @@ int main(int argc, char **argv) {
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();
     } else {
+        std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        //int idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
-        //std::string fileprefix = Sandia_RioGrande_fileprefix;
-        //std::string filepostfix = Sandia_RioGrande_filepostfix;
-        //std::string fileprefix = Sandia_Farms_fileprefix;
-        //std::string filepostfix = Sandia_Farms_filepostfix;
-        //ss << std::setfill('0') << std::setw(2) << idx;
-        //initialize_Sandia_SPHRead(matlab_readvar_map);
-        
+        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        std::string fileprefix = Sandia_RioGrande_fileprefix;
+        std::string filepostfix = Sandia_RioGrande_filepostfix;
+        //        std::string fileprefix = Sandia_Farms_fileprefix;
+        //        std::string filepostfix = Sandia_Farms_filepostfix;
+        ss << std::setfill('0') << std::setw(2) << file_idx;
+        initialize_Sandia_SPHRead(matlab_readvar_map);
+
         // GOTCHA SAR DATA FILE LOADING
-        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-        std::string fileprefix = GOTCHA_fileprefix;
-        std::string filepostfix = GOTCHA_filepostfix;
-        std::stringstream ss;
-        ss << std::setfill('0') << std::setw(3) << azimuth;
+        //        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+        //        std::string fileprefix = GOTCHA_fileprefix;
+        //        std::string filepostfix = GOTCHA_filepostfix;
+        //        ss << std::setfill('0') << std::setw(3) << azimuth;
+        //        initialize_GOTCHA_MATRead(matlab_readvar_map);
+
         inputfile = fileprefix + ss.str() + filepostfix + ".mat";
-        initialize_GOTCHA_MATRead(matlab_readvar_map);
     }
 
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
@@ -437,19 +462,19 @@ int main(int argc, char **argv) {
     // Structure must be only two numbers in the order real, imag
     // to be binary compatible with the C99 complex type
 
-    std::cout << "fft" << std::endl;
-    for (int i = 0; i < 8; ++i) {
-        std::cout << data[i] << std::endl;
-    }
+    //    std::cout << "fft" << std::endl;
+    //    for (int i = 0; i < 8; ++i) {
+    //        std::cout << data[i] << std::endl;
+    //    }
 
     // inverse fft
     //ifft(data);
     ifftw(data);
 
-    std::cout << std::endl << "ifft" << std::endl;
-    for (int i = 0; i < 8; ++i) {
-        std::cout << data[i] << std::endl;
-    }
+    //    std::cout << std::endl << "ifft" << std::endl;
+    //    for (int i = 0; i < 8; ++i) {
+    //        std::cout << data[i] << std::endl;
+    //    }
     return EXIT_SUCCESS;
 }
 
