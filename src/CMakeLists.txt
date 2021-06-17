@@ -5,7 +5,7 @@ add_definitions(/DMX_COMPAT_64)
 add_definitions(/DMATLAB_DEFAULT_RELEASE=R2019b)
 add_definitions(/DUSE_MEX_CMD)
 
-find_package(Matlab REQUIRED)
+find_package(Matlab)
 find_package(CUDA)
 
 add_subdirectory(cpuBackProjection)

@@ -6,8 +6,8 @@ project(uncc_sar_pack LANGUAGES CXX)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
-#set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2020a")
-set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2021a")
+set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2020a")
+#set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2021a")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
@@ -27,6 +27,7 @@ set(MATLAB_PROJECT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 add_subdirectory(third_party)
 include_directories(
     third_party/matio/src
+    ${PROJECT_BINARY_DIR}/third_party/matio/src
 )
 link_directories(
     ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
