@@ -251,6 +251,63 @@ std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/D
 // index here is 3 digit azimuth [001,...,360]
 std::string GOTCHA_filepostfix = "_HH";
 
+void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
+    matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
+    matlab_readvar_map["sph_MATData.preamble"] = NULL;
+    matlab_readvar_map["sph_MATData.Const"] = NULL;
+    matlab_readvar_map["sph_MATData.Data"] = NULL;
+
+    // data.phdata = sphObj.Data.SampleData(:,:,channelIndex);
+    // % 1 = HH, 2 = HV, 3 = VH, 4 = VV
+    // data.vfreq = zeros(numSamples, numPulses);
+    // data.freq = data.vfreq(:,1);
+    // data.AntX = sphObj.Data.radarCoordinateFrame.x(pulseIndices);
+    // data.AntY = sphObj.Data.radarCoordinateFrame.y(pulseIndices);
+    // data.AntZ = sphObj.Data.radarCoordinateFrame.z(pulseIndices);
+    // chirpRateDelta = sphObj.Data.ChirpRateDelta(:, channelIndex);
+    // startF = sphObj.Data.StartF(:, channelIndex);
+    // startF = sphObj.Data.StartF(pulseIndex);
+    // freq_per_sec = sphObj.Data.ChirpRate(pulseIndex);
+    // freq_pre_sec_sq = sphObj.Data.ChirpRateDelta(pulseIndex);
+    // wgs84 = wgs84Ellipsoid('kilometer');
+    // antennaPos_ecef = zeros(numPulses,3);    
+    // velocity(pulseIndex,:) = [sphObj.Data.VelEast(pulseIndex), ...
+    //        sphObj.Data.VelNorth(pulseIndex), ...
+    //        sphObj.Data.VelDown(pulseIndex)];
+    //        
+    //    % antenna phase center offset from the radar
+    // antennaPos_geodetic = [sphObj.Data.RxPos.xat(pulseIndex), ...
+    //        sphObj.Data.RxPos.yon(pulseIndex), ...
+    //        sphObj.Data.RxPos.zae(pulseIndex)];        
+    //    % Earth-Centered Earth-Fixed (ECEF)
+    //    [antX, antY, antZ] = geodetic2ecef(wgs84, antennaPos_geodetic(1), ...
+    //        antennaPos_geodetic(2), antennaPos_geodetic(3));
+    //    antennaPos_ecef(pulseIndex,:) = [antX, antY, antZ];
+    //    freq_per_sample(pulseIndex) = freq_per_sec/sphObj.preamble.ADF; % freq_per_sample    
+    // freq_per_sec = sphObj.Data.ChirpRate(pulseIndex);
+    // freq_pre_sec_sq = sphObj.Data.ChirpRateDelta(pulseIndex);
+    // analogToDigitalConverterFrequency = sphObj.preamble.ADF; % Hertz
+    // Ts0 = 1.0/analogToDigitalConverterFrequency;
+    // chirpRates_rad = sphObj.Data.ChirpRate(1, pulseIndices, channelIndex)*pi/180;
+    // nominalChirpRate = mean(chirpRates_rad);
+    // centerFreq_rad = sphObj.preamble.DesCntrFreq*pi/180;
+    // nominalChirpRate_rad = nominalChirpRate*pi/180;
+
+}
+
+void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
+    matlab_readvar_map["data.fp"] = NULL;
+    matlab_readvar_map["data.freq"] = NULL;
+    matlab_readvar_map["data.x"] = NULL;
+    matlab_readvar_map["data.y"] = NULL;
+    matlab_readvar_map["data.z"] = NULL;
+    matlab_readvar_map["data.r0"] = NULL;
+    matlab_readvar_map["data.th"] = NULL;
+    matlab_readvar_map["data.phi"] = NULL;
+    matlab_readvar_map["data.af.r_correct"] = NULL;
+    matlab_readvar_map["data.af.ph_correct"] = NULL;
+}
+
 bool allocMATData(matvar_t *matvar) {
     switch (matvar->class_type) {
         case MAT_C_DOUBLE:
@@ -328,6 +385,7 @@ int main(int argc, char **argv) {
     Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
     Complex out[8];
     CArray data(test, 8);
+    std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
 
     cxxopts::Options options("cpuBackProjection", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
     cxxopts_integration(options);
@@ -351,7 +409,8 @@ int main(int argc, char **argv) {
         //std::string fileprefix = Sandia_Farms_fileprefix;
         //std::string filepostfix = Sandia_Farms_filepostfix;
         //ss << std::setfill('0') << std::setw(2) << idx;
-
+        //initialize_Sandia_SPHRead(matlab_readvar_map);
+        
         // GOTCHA SAR DATA FILE LOADING
         int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
         std::string fileprefix = GOTCHA_fileprefix;
@@ -359,25 +418,10 @@ int main(int argc, char **argv) {
         std::stringstream ss;
         ss << std::setfill('0') << std::setw(3) << azimuth;
         inputfile = fileprefix + ss.str() + filepostfix + ".mat";
+        initialize_GOTCHA_MATRead(matlab_readvar_map);
     }
 
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
-    std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
-    matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
-    matlab_readvar_map["sph_MATData.preamble"] = NULL;
-    matlab_readvar_map["sph_MATData.Const"] = NULL;
-    matlab_readvar_map["sph_MATData.Data"] = NULL;
-
-    matlab_readvar_map["data.fp"] = NULL;
-    matlab_readvar_map["data.freq"] = NULL;
-    matlab_readvar_map["data.x"] = NULL;
-    matlab_readvar_map["data.y"] = NULL;
-    matlab_readvar_map["data.z"] = NULL;
-    matlab_readvar_map["data.r0"] = NULL;
-    matlab_readvar_map["data.th"] = NULL;
-    matlab_readvar_map["data.phi"] = NULL;
-    matlab_readvar_map["data.af.r_correct"] = NULL;
-    matlab_readvar_map["data.af.ph_correct"] = NULL;
 
     if (!read_MAT_Variables(inputfile, matlab_readvar_map)) {
         std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
