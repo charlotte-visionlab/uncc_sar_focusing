@@ -7,9 +7,6 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         mxArray* plhs[], /* array of mxArray pointers to outputs */
         int nrhs, /* number of RHS (input) args */
         const mxArray* prhs[]) /* array of pointers to inputs*/ {
-    /* Section 1. 
-     * These are the variables we'll use */
-    /* Subsection A: these come from Matlab and are the same as the ATK code */
     mxComplexSingle* range_profiles;
     float* minF;
     float* aimpoint_ranges;
@@ -22,15 +19,8 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
 
     float min_eff_idx; //, Nrangebins;
 
-    /* Subsection B: these are computed from the matlab inputs */
     int Npulses, Nrangebins, Nfft;
-    float c__4_delta_freq;
-    float pi_4_f0__clight;
 
-    /* Subsection C: these are CUDA-specific options */
-    int deviceId, blockwidth, blockheight;
-
-    /* Subsection D: these are output variables */
     mxComplexSingle* output_image;
 
     /* Section 2. 
@@ -67,9 +57,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     Wx = (float) mxGetScalar(prhs[12]);
     Wy = (float) mxGetScalar(prhs[13]);
 
-    /* Section 3.
-     * Set up some intermediate values */
-
+    /* Setup some intermediate values */
 
     if (nrhs == 16) {
         min_eff_idx = (float) mxGetScalar(prhs[14]);
@@ -79,18 +67,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         //Nrangebins = Nrangebins;
     }
 
-
-    /* Various collection-specific constants */
-
-    //c__4_delta_freq = CLIGHT / (4.0f * delta_frequency);
-    c__4_delta_freq = 0;
-    /* FIXME: this TOTALLY prevents variable start frequency!!!! */
-    //pi_4_f0__clight = PI * 4.0f * extract_f0(minF, Npulses) / CLIGHT;
-    pi_4_f0__clight = 0;
-    //convert_f0(minF, Npulses);
-
-    /* Section 4.
-     * Set up Matlab outputs */
+    /* setup Matlab output */
     plhs[0] = mxCreateNumericMatrix(Ny_pix, Nx_pix, mxSINGLE_CLASS, mxCOMPLEX);
     output_image = mxGetComplexSingles(plhs[0]);
     //output_image.real = (float*) mxGetPr(plhs[0]);
@@ -109,11 +86,8 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     run_bp(range_profiles_arr, xobs, yobs, zobs,
             aimpoint_ranges,
             Npulses, Nrangebins, Nx_pix, Ny_pix, Nfft,
-            blockwidth, blockheight,
-            deviceId,
             output_image_arr,
             0, Ny_pix,
-            c__4_delta_freq, pi_4_f0__clight,
             minF, deltaF,
             x0, y0, Wx, Wy, min_eff_idx, Nrangebins);
     for (int i = 0; i < output_image_arr.size(); i++) {
