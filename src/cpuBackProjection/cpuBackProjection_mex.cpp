@@ -87,7 +87,6 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
             aimpoint_ranges,
             Npulses, Nrangebins, Nx_pix, Ny_pix, Nfft,
             output_image_arr,
-            0, Ny_pix,
             minF, deltaF,
             x0, y0, Wx, Wy, min_eff_idx, Nrangebins);
     for (int i = 0; i < output_image_arr.size(); i++) {

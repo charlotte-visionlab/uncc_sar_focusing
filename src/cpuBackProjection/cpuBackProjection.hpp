@@ -56,9 +56,7 @@ public:
 
 void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int Nfft,
-        CArray& output_image,
-        int start_output_index, int num_output_rows,
-        float* minF, float* deltaF,
+        CArray& output_image, float* minF, float* deltaF,
         float x0, float y0, float Wx, float Wy,
         float min_eff_idx, float total_proj_length);
 

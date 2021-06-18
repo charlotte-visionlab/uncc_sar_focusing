@@ -1,22 +1,11 @@
-
+#include <iomanip>
 #include <limits>   // std::numeric_limits
-
-#include <stdio.h>  // printf 
-#include <time.h>
 
 #include "cpuBackProjection.hpp"
 
-#define MEXDEBUG      1
-
-#ifndef VERBOSE
-#define VERBOSE       0
-#endif
-
 void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int Nfft,
-        CArray& output_image,
-        int start_output_index, int num_output_rows,
-        float* minF, float* deltaF,
+        CArray& output_image, float* minF, float* deltaF,
         float x0, float y0, float Wx, float Wy,
         float min_eff_idx, float total_proj_length) {
 
@@ -71,8 +60,11 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
     /*
     % Display maximum scene size and resolution
      */
-    printf("Maximum Scene Size:  %.2f m range, %.2f m cross-range\n", maxWr, maxWx);
-    printf("Resolution:  %.2fm range, %.2f m cross-range\n", dr, dx);
+    std::cout << "Maximum Scene Size:  " << std::setprecision(2) << maxWr << " m range, " 
+            << maxWx << " m cross-range" << std::endl;
+    std::cout << "Resolution:  " << std::setprecision(2) << dr << "m range, " 
+            << dx << " m cross-range" << std::endl;
+
     /*
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
@@ -97,10 +89,11 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
             max_Rvec = r_vec[rIdx];
         }
     }
-
+    float timeleft = 0.0f;
     for (int pulseIndex = 0; pulseIndex < Npulses; pulseIndex++) {
         if (pulseIndex > 1 && (pulseIndex % 100) == 0) {
-            printf("Pulse %d of %d, %.02f minutes remaining\n", pulseIndex, Npulses, 0.0f);
+            std::cout << "Pulse " << pulseIndex << " of " << Npulses 
+                    << ", " << std::setprecision(2) << timeleft << " minutes remaining" << std::endl;            
         }
 
         CArray phaseData = phd[std::slice(pulseIndex * Nfft, Nfft, 1)];
