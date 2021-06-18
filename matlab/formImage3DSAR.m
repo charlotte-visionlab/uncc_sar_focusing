@@ -27,8 +27,8 @@ dvdPath = '../../../sar/GOTCHA/Gotcha-CP-All';
 % Define input data parameters here
 pass = 1;               % What pass to image (1-8)
 pol = 'HH';             % What polarization to image (HH,HV,VH,VV)
-minaz = 39;             % Minimum azimuth angle (degrees)
-maxaz = 42;             % Maximum azimuth angle (degrees)
+minaz = 01;             % Minimum azimuth angle (degrees)
+maxaz = 01;             % Maximum azimuth angle (degrees)
 af_flag = 0;            % Use autofocus flag (Only available for HH and VV)
 taper_flag = 0;         % Add a hamming taper for sidelobe control
 

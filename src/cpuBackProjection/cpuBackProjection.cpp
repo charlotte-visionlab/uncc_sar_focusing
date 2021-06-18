@@ -60,9 +60,9 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
     /*
     % Display maximum scene size and resolution
      */
-    std::cout << "Maximum Scene Size:  " << std::setprecision(2) << maxWr << " m range, " 
+    std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << maxWr << " m range, " 
             << maxWx << " m cross-range" << std::endl;
-    std::cout << "Resolution:  " << std::setprecision(2) << dr << "m range, " 
+    std::cout << "Resolution:  " << std::fixed << std::setprecision(2) << dr << "m range, " 
             << dx << " m cross-range" << std::endl;
 
     /*
@@ -119,7 +119,7 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
 
 Complex interp1(const float* xSampleLocations, const int nSamples, const CArray& sampleValues, const float xInterpLocation, const float xIndex) {
     Complex iVal(0, 0);
-    int rightIdx = std::floor(xIndex);
+    int rightIdx = std::floor(xIndex)-1;
     while (++rightIdx < nSamples && xSampleLocations[rightIdx] <= xInterpLocation);
     if (rightIdx == nSamples || rightIdx == 0) {
         std::cout << "Error::Invalid interpolation range." << std::endl;
