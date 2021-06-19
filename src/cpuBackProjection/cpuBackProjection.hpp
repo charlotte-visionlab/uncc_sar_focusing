@@ -11,6 +11,7 @@
 #include <iostream>
 #include <iterator>
 #include <cmath>
+#include <numeric>
 #include <string>
 #include <unordered_map>
 #include <valarray>
@@ -54,16 +55,63 @@ public:
 //    _numTp w;
 //};
 
+template<typename _numTp>
+class SAR_ImageFormationParameters {
+public:
+    int pol; // What polarization to image (HH,HV,VH,VV)
+
+    // Define image parameters here
+    int N_fft; // Number of samples in FFT
+    int N_xpix; // Number of samples in x direction
+    int N_ypix; // Number of samples in y direction
+    _numTp x0; // Center of image scene in x direction (m) relative to target swath phase center
+    _numTp y0; // Center of image scene in y direction (m) relative to target swath phase center
+    _numTp dyn_range; // dB range [0,...,-dyn_range] as the dynamic range to display/map to 0-255 grayscale intensity
+};
+
 template<typename __numTp>
 struct simpleMatrix {
 public:
     std::vector<int> shape;
     std::vector<__numTp> data;
+
+    int numValues(int polarityIdx = -1) {
+        return (shape.size() == 0) ? 0 :
+                std::accumulate(begin(shape), end(shape), 1, std::multiplies<int>()) / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
+    }
+
+    bool isEmpty() {
+        return shape.size() == 0;
+    }
+
+    template <typename _Tp>
+    friend std::ostream& operator<<(std::ostream& output, const simpleMatrix<__numTp> &c);
+
 };
 
+template <typename __numTp>
+inline std::ostream& operator<<(std::ostream& output, const simpleMatrix<__numTp>& sMat) {
+    int NUMVALS = 10;
+    std::string dimsStr;
+    if (!sMat.shape.empty()) {
+        dimsStr = std::accumulate(sMat.shape.begin() + 1, sMat.shape.end(),
+                std::to_string(sMat.shape[0]), [](const std::string & a, int b) {
+                    return a + ',' + std::to_string(b);
+                });
+    }
+    output << "[" << dimsStr << "] = {"; \
+    typename std::vector<__numTp>::const_iterator i;
+    for (i = sMat.data.begin(); i != sMat.data.end() && i != sMat.data.begin() + NUMVALS; ++i) {
+        output << *i << ", ";
+    }
+    output << ((sMat.data.size() > NUMVALS) ? " ..." : "") << " }";
+    return output;
+}
+
 template<typename _numTp>
-struct Aperture {
+class SAR_Aperture {
 public:
+
     bool format_GOTCHA;
 
     // GOTCHA + Sandia Fields
@@ -91,41 +139,54 @@ public:
     simpleMatrix<_numTp> chirpRate;
     simpleMatrix<_numTp> chirpRateDelta;
 
+    // Fields set automatically by program computations or manually via user input arguments
+    // 1 - HH, 2 -HV, 3 - VH, 4 - VV
+    int polarity_channel;
+    // array index to use for polarity data when indexing multi-dimensional arrays
+    // -1 = there is only one polarity in the SAR data file
+    int polarity_dimension;
+
+    // Fields set automatically
+    int numRangeSamples;
+    int numAzimuthSamples;
+    int numPolarities;
+
+    SAR_Aperture() : polarity_channel(1), polarity_dimension(-1) {
+    };
+
+    virtual ~SAR_Aperture() {
+    };
+
     template <typename _Tp>
-    friend std::ostream& operator<<(std::ostream& output, const Aperture<_Tp> &c);
+    friend std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_Tp> &c);
 };
 
-#define streamVec(fieldname, __Tp, sMat, os, nVals) ({\
-    os << fieldname << "["; for (auto i:sMat.shape) os << i << 'x'; os << "1] = {"; \
-    typename std::vector<__Tp>::const_iterator i; \
-    for (i = sMat.data.begin(); \
-            i != sMat.data.end() && i != sMat.data.begin() + nVals; ++i) \
-            {os << *i << ", ";} }); \
-            os << ((sMat.data.size() > nVals) ? " ..." : "") << " }" << std::endl
-
 template <typename _numTp>
-inline std::ostream& operator<<(std::ostream& output, const Aperture<_numTp>& c) {
+inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>& c) {
     int NUMVALS = 10;
     if (c.format_GOTCHA) {
-        streamVec("sampleData", Complex, c.sampleData, output, NUMVALS);
-        streamVec("freq", _numTp, c.freq, output, NUMVALS);
-        streamVec("Ant_x", _numTp, c.Ant_x, output, NUMVALS);
-        streamVec("Ant_y", _numTp, c.Ant_y, output, NUMVALS);
-        streamVec("Ant_z", _numTp, c.Ant_z, output, NUMVALS);
-        streamVec("slant_range", _numTp, c.Ant_z, output, NUMVALS);
-        streamVec("theta", _numTp, c.Ant_z, output, NUMVALS);
-        streamVec("phi", _numTp, c.Ant_z, output, NUMVALS);
-        streamVec("af.r_correct", _numTp, c.af.r_correct, output, NUMVALS);
-        streamVec("af.ph_correct", _numTp, c.af.ph_correct, output, NUMVALS);
+        output << c.sampleData;
+        output << "sampleData" << c.sampleData << std::endl;
+        output << "freq" << c.freq << std::endl;
+        output << "Ant_x" << c.Ant_x << std::endl;
+        output << "Ant_y" << c.Ant_y << std::endl;
+        output << "Ant_z" << c.Ant_z << std::endl;
+        output << "slant_range" << c.slant_range << std::endl;
+        output << "theta" << c.theta << std::endl;
+        output << "phi" << c.phi << std::endl;
+        output << "af.r_correct" << c.af.r_correct << std::endl;
+        output << "af.ph_correct" << c.af.ph_correct << std::endl;
     } else {
-        streamVec("sampleData", Complex, c.sampleData, output, NUMVALS);
-        streamVec("Ant_x", _numTp, c.Ant_x, output, NUMVALS);
-        streamVec("Ant_y", _numTp, c.Ant_y, output, NUMVALS);
-        streamVec("Ant_z", _numTp, c.Ant_z, output, NUMVALS);
-        streamVec("ADF", _numTp, c.ADF, output, NUMVALS);
-        streamVec("StartF", _numTp, c.startF, output, NUMVALS);
-        streamVec("ChirpRate", _numTp, c.chirpRate, output, NUMVALS);
-        streamVec("ChirpRateDelta", _numTp, c.chirpRateDelta, output, NUMVALS);
+        output << "sampleData" << c.sampleData << std::endl;
+        output << "Ant_x" << c.Ant_x << std::endl;
+        output << "Ant_y" << c.Ant_y << std::endl;
+        output << "Ant_z" << c.Ant_z << std::endl;
+        output << "ADF" << c.ADF << std::endl;
+        output << "StartF" << c.startF << std::endl;
+        output << "ChirpRate" << c.chirpRate << std::endl;
+        output << "ChirpRateDelta" << c.chirpRateDelta << std::endl;
+        output << "freq" << c.freq << std::endl;
+        output << "slant_range" << c.slant_range << std::endl;
     }
     return output;
 }

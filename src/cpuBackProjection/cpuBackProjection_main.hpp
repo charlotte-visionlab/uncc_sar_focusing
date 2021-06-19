@@ -9,6 +9,8 @@
 #define CPUBACKPROJECTION_MAIN_HPP
 
 #include <complex>
+#include <numeric>
+
 #include <matio.h>
 
 #include "cpuBackProjection.hpp"
@@ -106,13 +108,7 @@ int import_MATMatrixComplex(matvar_t* matVar, simpleMatrix<_complexTp>& sMat) {
 }
 
 template<typename _numTp>
-int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, Aperture<_numTp>& aperture) {
-    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
+int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, SAR_Aperture<_numTp>& aperture) {
     if (fieldname == "sph_MATData.Data.SampleData") {
         if (!matVar->isComplex) {
             std::cout << "import_GOTCHA_MATData::Phase data is not complex-valued!" << std::endl;
@@ -137,11 +133,17 @@ int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, Aperture<_num
         std::cout << "import_Sandia_MATData::Fieldname " << fieldname << " not recognized.";
         return EXIT_FAILURE;
     }
+    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
     return EXIT_SUCCESS;
 }
 
 template<typename _numTp>
-int import_GOTCHA_MATData(matvar_t* matVar, std::string fieldname, Aperture<_numTp>& aperture) {
+int import_GOTCHA_MATData(matvar_t* matVar, std::string fieldname, SAR_Aperture<_numTp>& aperture) {
     if (fieldname == "data.fp") {
         if (!matVar->isComplex) {
             std::cout << "import_GOTCHA_MATData::Phase data is not complex-valued!" << std::endl;
@@ -173,13 +175,13 @@ int import_GOTCHA_MATData(matvar_t* matVar, std::string fieldname, Aperture<_num
     return EXIT_SUCCESS;
 }
 
-#define VARPATH(stringvec) std::accumulate(stringvec.begin(), stringvec.end(), std::string(""))
+#define CONCAT_STRINGVECTOR(stringvec) std::accumulate(stringvec.begin(), stringvec.end(), std::string(""))
 
 template<typename _numTp>
 int read_MAT_Struct(mat_t* matfp, matvar_t * struct_matVar,
         std::unordered_map<std::string, matvar_t*> &matlab_readvar_map,
         std::vector<std::string>& context,
-        Aperture<_numTp>& aperture) {
+        SAR_Aperture<_numTp>& aperture) {
 
     context.push_back(".");
     unsigned nFields = Mat_VarGetNumberOfFields(struct_matVar);
@@ -192,7 +194,7 @@ int read_MAT_Struct(mat_t* matfp, matvar_t * struct_matVar,
                 read_MAT_Struct(matfp, struct_fieldVar, matlab_readvar_map, context, aperture);
                 context.pop_back();
             } else {
-                std::string current_fieldname = VARPATH(context) + varName;
+                std::string current_fieldname = CONCAT_STRINGVECTOR(context) + varName;
                 std::cout << current_fieldname << std::endl;
                 for (std::unordered_map<std::string, matvar_t*>::iterator it = matlab_readvar_map.begin();
                         it != matlab_readvar_map.end(); ++it) {
@@ -228,7 +230,7 @@ int read_MAT_Struct(mat_t* matfp, matvar_t * struct_matVar,
 template<typename _numTp>
 int read_MAT_Variables(std::string inputfile,
         std::unordered_map<std::string, matvar_t*> &matlab_readvar_map,
-        Aperture<_numTp>& aperture) {
+        SAR_Aperture<_numTp>& aperture) {
     mat_t *matfp = Mat_Open(inputfile.c_str(), MAT_ACC_RDONLY);
     std::vector<std::string> context;
     if (matfp) {
@@ -239,9 +241,9 @@ int read_MAT_Variables(std::string inputfile,
                 context.push_back(varName);
                 read_MAT_Struct(matfp, root_matVar, matlab_readvar_map, context, aperture);
             } else if (root_matVar->data_type == matio_types::MAT_T_CELL) {
-                std::cout << VARPATH(context) + varName << "is data of type MAT_T_CELL and cannot be read." << std::endl;
+                std::cout << CONCAT_STRINGVECTOR(context) + varName << "is data of type MAT_T_CELL and cannot be read." << std::endl;
             } else {
-                std::string current_fieldname = VARPATH(context) + varName;
+                std::string current_fieldname = CONCAT_STRINGVECTOR(context) + varName;
                 std::cout << current_fieldname << " reading data..." << std::endl;
                 int read_err = Mat_VarReadDataAll(matfp, root_matVar);
                 if (read_err) {
@@ -262,5 +264,58 @@ int read_MAT_Variables(std::string inputfile,
     return EXIT_SUCCESS;
 }
 
+template<typename _numTp>
+int initializeSARFocusingVariables(SAR_Aperture<_numTp>& aperture) {
+    aperture.numRangeSamples = aperture.sampleData.shape[0];
+    aperture.numAzimuthSamples = aperture.sampleData.shape[1];
+    aperture.numPolarities = (aperture.sampleData.shape.size() > 2) ? aperture.sampleData.shape[2] : 1;
+    int numSARSamples = aperture.numRangeSamples * aperture.numAzimuthSamples;
+    if (aperture.Ant_x.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples ||
+            aperture.Ant_y.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples ||
+            aperture.Ant_z.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+        std::cout << "initializeSARFocusingVariables::Not enough antenna positions available to focus the selected SAR data." << std::endl;
+    }
+    if (aperture.freq.numValues(aperture.polarity_dimension) != numSARSamples) {
+        std::cout << "initializeSARFocusingVariables::Found " << aperture.freq.numValues(aperture.polarity_dimension)
+                << " frequency measurements and need " << numSARSamples << " measurements. Augmenting frequency data for SAR focusing." << std::endl;
+        if (!aperture.freq.isEmpty() && aperture.freq.shape[0] == aperture.numRangeSamples) {
+            std::cout << "Assuming constant frequency samples for each SAR pulse." << std::endl;
+            // make aperture.numAzimuthSamples-1 copies of the first frequency sample vector
+            aperture.freq.shape.clear();
+            aperture.freq.shape.push_back(aperture.numRangeSamples);
+            aperture.freq.shape.push_back(aperture.numAzimuthSamples);
+            for (int azIdx = 1; azIdx < aperture.numAzimuthSamples; ++azIdx) {
+                aperture.freq.data.insert(aperture.freq.data.end(), &aperture.freq.data[0], &aperture.freq.data[aperture.numRangeSamples]);
+            }
+        } else if (!aperture.startF.isEmpty() && aperture.startF.shape[1] == aperture.numAzimuthSamples &&
+                !aperture.ADF.isEmpty() && aperture.ADF.shape[0] == 1 &&
+                !aperture.chirpRate.isEmpty() && aperture.chirpRate.shape[1] == aperture.numAzimuthSamples) {
+            std::cout << "Assuming variable frequency samples for each SAR pulse. Interpolating frequency samples from chirp rate, sample rate and start frequency." << std::endl;
+            aperture.freq.data.clear();
+            aperture.freq.shape.clear();
+            aperture.freq.shape.push_back(aperture.numRangeSamples);
+            aperture.freq.shape.push_back(aperture.numAzimuthSamples);
+            for (int azIdx = 0; azIdx < aperture.numAzimuthSamples; ++azIdx) {
+                for (int freqIdx = 0; freqIdx < aperture.numRangeSamples; freqIdx++) {
+                    _numTp freqSample = aperture.startF.data[azIdx] + freqIdx * aperture.chirpRate.data[azIdx] / aperture.ADF.data[0];
+                    aperture.freq.data.push_back(freqSample);
+                }
+            }
+        }
+
+    }
+    if (aperture.slant_range.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+        std::cout << "initializeSARFocusingVariables::Found " << aperture.slant_range.numValues(aperture.polarity_dimension)
+                << " slant range measurements and need " << aperture.numAzimuthSamples << " measurements. Augmenting slant range data for SAR focusing." << std::endl;
+        aperture.slant_range.shape.clear();
+        aperture.slant_range.shape.data();
+        aperture.slant_range.shape.push_back(aperture.numAzimuthSamples);
+        for (int azIdx = 0; azIdx < aperture.numAzimuthSamples; ++azIdx) {
+            aperture.slant_range.data.push_back(std::sqrt((aperture.Ant_x.data[azIdx] * aperture.Ant_x.data[azIdx]) +
+                    (aperture.Ant_y.data[azIdx] * aperture.Ant_y.data[azIdx]) +
+                    (aperture.Ant_z.data[azIdx] * aperture.Ant_z.data[azIdx])));
+        }
+    }
+}
 #endif /* CPUBACKPROJECTION_MAIN_HPP */
 

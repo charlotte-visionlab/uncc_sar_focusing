@@ -1,24 +1,10 @@
 #include <iomanip>
-#include <numeric>
 #include <sstream>
 
 #include <cxxopts.hpp>
 
 #include "cpuBackProjection.hpp"
 #include "cpuBackProjection_main.hpp"
-
-// For details see: https://github.com/jarro2783/cxxopts
-
-void cxxopts_integration(cxxopts::Options& options) {
-
-    options.add_options()
-            ("i,input", "Input file", cxxopts::value<std::string>())
-            //("f,format", "Data format {GOTCHA, Sandia, auto}", cxxopts::value<std::string>()->default_value("auto"))
-            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
-            ("o,output", "Output file", cxxopts::value<std::string>())
-            ("h,help", "Print usage")
-            ;
-}
 
 std::string HARDCODED_SARDATA_PATH = "/home/arwillis/sar/";
 
@@ -34,7 +20,7 @@ std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/D
 // index here is 3 digit azimuth [001,...,360]
 std::string GOTCHA_filepostfix = "_HH";
 
-void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
+void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*>& matlab_readvar_map) {
     matlab_readvar_map["data.fp"] = NULL;
     matlab_readvar_map["data.freq"] = NULL;
     matlab_readvar_map["data.x"] = NULL;
@@ -63,6 +49,20 @@ void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matla
     //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
     //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
     //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
+}
+
+// For details see: https://github.com/jarro2783/cxxopts
+
+void cxxopts_integration(cxxopts::Options& options) {
+
+    options.add_options()
+            ("i,input", "Input file", cxxopts::value<std::string>())
+            //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
+            ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
+            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
+            ("o,output", "Output file", cxxopts::value<std::string>())
+            ("h,help", "Print usage")
+            ;
 }
 
 int main(int argc, char **argv) {
@@ -98,10 +98,10 @@ int main(int argc, char **argv) {
         initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
-        //        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-        //        std::string fileprefix = GOTCHA_fileprefix;
-        //        std::string filepostfix = GOTCHA_filepostfix;
-        //        ss << std::setfill('0') << std::setw(3) << azimuth;
+//        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+//        std::string fileprefix = GOTCHA_fileprefix;
+//        std::string filepostfix = GOTCHA_filepostfix;
+//        ss << std::setfill('0') << std::setw(3) << azimuth;
 
         initialize_GOTCHA_MATRead(matlab_readvar_map);
 
@@ -110,11 +110,34 @@ int main(int argc, char **argv) {
 
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
-    Aperture<float> aperture_data;
+    SAR_Aperture<float> aperture_data;
     if (read_MAT_Variables(inputfile, matlab_readvar_map, aperture_data) == EXIT_FAILURE) {
         std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
         return EXIT_FAILURE;
     }
+
+    std::cout << aperture_data << std::endl;
+
+    // Sandia SAR data is multi-channel having up to 4 polarities
+    // 1 = HH, 2 = HV, 3 = VH, 4 = VVbandwidth = 0:freq_per_sample:(numRangeSamples-1)*freq_per_sample;
+    if (result.count("polarity")) {
+        std::string polarity = result["polarity"].as<std::string>();
+        if (polarity == "HH" && aperture_data.sampleData.shape.size() >= 1) {
+            aperture_data.polarity_channel = 1;
+        } else if (polarity == "HV" && aperture_data.sampleData.shape.size() >= 2) {
+            aperture_data.polarity_channel = 2;
+        } else if (polarity == "VH" && aperture_data.sampleData.shape.size() >= 3) {
+            aperture_data.polarity_channel = 3;
+        } else if (polarity == "VV" && aperture_data.sampleData.shape.size() >= 4) {
+            aperture_data.polarity_channel = 4;
+        } else {
+            std::cout << "Request polarity channel " << polarity << " is not available." << std::endl;
+            return EXIT_FAILURE;
+        }
+    }
+
+    initializeSARFocusingVariables(aperture_data);
+
     std::cout << aperture_data << std::endl;
     //finalize_GOTCHA_MATRead(matlab_readvar_map, aperture_data);
     //finalize_GOTCHA_MATRead(aperture_data, matlab_readvar_map);
