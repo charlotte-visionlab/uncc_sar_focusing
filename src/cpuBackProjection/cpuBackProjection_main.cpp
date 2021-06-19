@@ -60,10 +60,13 @@ void cxxopts_integration(cxxopts::Options& options) {
             //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
             ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
             ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
-            ("o,output", "Output file", cxxopts::value<std::string>())
+            ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
+            ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
             ("h,help", "Print usage")
             ;
 }
+
+typedef float PRECISION;
 
 int main(int argc, char **argv) {
     Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
@@ -88,20 +91,20 @@ int main(int argc, char **argv) {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
-        std::string fileprefix = Sandia_RioGrande_fileprefix;
-        std::string filepostfix = Sandia_RioGrande_filepostfix;
+//        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+//        std::string fileprefix = Sandia_RioGrande_fileprefix;
+//        std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
         //        std::string filepostfix = Sandia_Farms_filepostfix;
-        ss << std::setfill('0') << std::setw(2) << file_idx;
+//        ss << std::setfill('0') << std::setw(2) << file_idx;
 
         initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
-//        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-//        std::string fileprefix = GOTCHA_fileprefix;
-//        std::string filepostfix = GOTCHA_filepostfix;
-//        ss << std::setfill('0') << std::setw(3) << azimuth;
+                int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+                std::string fileprefix = GOTCHA_fileprefix;
+                std::string filepostfix = GOTCHA_filepostfix;
+                ss << std::setfill('0') << std::setw(3) << azimuth;
 
         initialize_GOTCHA_MATRead(matlab_readvar_map);
 
@@ -110,44 +113,53 @@ int main(int argc, char **argv) {
 
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
-    SAR_Aperture<float> aperture_data;
-    if (read_MAT_Variables(inputfile, matlab_readvar_map, aperture_data) == EXIT_FAILURE) {
+    SAR_Aperture<PRECISION> SAR_aperture_data;
+    if (read_MAT_Variables(inputfile, matlab_readvar_map, SAR_aperture_data) == EXIT_FAILURE) {
         std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
         return EXIT_FAILURE;
     }
-
-    std::cout << aperture_data << std::endl;
+    // Print out raw data imported from file
+    std::cout << SAR_aperture_data << std::endl;
 
     // Sandia SAR data is multi-channel having up to 4 polarities
     // 1 = HH, 2 = HV, 3 = VH, 4 = VVbandwidth = 0:freq_per_sample:(numRangeSamples-1)*freq_per_sample;
-    if (result.count("polarity")) {
-        std::string polarity = result["polarity"].as<std::string>();
-        if (polarity == "HH" && aperture_data.sampleData.shape.size() >= 1) {
-            aperture_data.polarity_channel = 1;
-        } else if (polarity == "HV" && aperture_data.sampleData.shape.size() >= 2) {
-            aperture_data.polarity_channel = 2;
-        } else if (polarity == "VH" && aperture_data.sampleData.shape.size() >= 3) {
-            aperture_data.polarity_channel = 3;
-        } else if (polarity == "VV" && aperture_data.sampleData.shape.size() >= 4) {
-            aperture_data.polarity_channel = 4;
-        } else {
-            std::cout << "Request polarity channel " << polarity << " is not available." << std::endl;
-            return EXIT_FAILURE;
-        }
+    std::string polarity = result["polarity"].as<std::string>();
+    if ((polarity == "HH" || polarity == "any") && SAR_aperture_data.sampleData.shape.size() >= 1) {
+        SAR_aperture_data.polarity_channel = 1;
+    } else if (polarity == "HV" && SAR_aperture_data.sampleData.shape.size() >= 2) {
+        SAR_aperture_data.polarity_channel = 2;
+    } else if (polarity == "VH" && SAR_aperture_data.sampleData.shape.size() >= 3) {
+        SAR_aperture_data.polarity_channel = 3;
+    } else if (polarity == "VV" && SAR_aperture_data.sampleData.shape.size() >= 4) {
+        SAR_aperture_data.polarity_channel = 4;
+    } else {
+        std::cout << "Requested polarity channel " << polarity << " is not available." << std::endl;
+        return EXIT_FAILURE;
     }
+    if (!SAR_aperture_data.format_GOTCHA) {
+        // the dimensional index of the polarity index in the 
+        // multi-dimensional array (for Sandia SPH SAR data)
+        SAR_aperture_data.polarity_dimension = 2;
+    }
+    // Print out data after critical data fields for SAR focusing have been computed
+    initialize_SAR_Aperture_Data(SAR_aperture_data);
 
-    initializeSARFocusingVariables(aperture_data);
+    std::cout << SAR_aperture_data << std::endl;
 
-    std::cout << aperture_data << std::endl;
-    //finalize_GOTCHA_MATRead(matlab_readvar_map, aperture_data);
-    //finalize_GOTCHA_MATRead(aperture_data, matlab_readvar_map);
-    //for (std::unordered_map<std::string, matvar_t*>::iterator it = matlab_readvar_map.begin();
-    //        it != matlab_readvar_map.end(); ++it) {
-    //std::string searched_fieldname = it->first;
-    //matvar_t* fieldVar = it->second;
+    SAR_ImageFormationParameters<PRECISION> SAR_image_params = SAR_ImageFormationParameters<PRECISION>::create<PRECISION>(SAR_aperture_data);
 
-    //fieldVar->data_type == matio_types::MAT_T_DOUBLE
-    //}
+    std::cout << SAR_image_params << std::endl;
+    
+    CArray output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
+
+    run_bp(SAR_aperture_data, SAR_image_params, output_image);
+    
+    // Required parameters for output generation manually overridden by command line arguments
+    SAR_image_params.output_filename = result["output"].as<std::string>();
+    SAR_image_params.dyn_range_dB = result["dynrange"].as<float>();
+
+    writeBMPFile(SAR_image_params, output_image);
+    //SAR_Focus_Image(SAR_aperture_data, SAR_image_params);
     // forward fft
     //fft(data);
     fftw(data);

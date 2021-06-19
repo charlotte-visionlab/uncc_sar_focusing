@@ -69,10 +69,6 @@ void run_bp(const CArray& phd, float* xObs, float* yObs, float* zObs, float* r,
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
      */
-    // idx should be integer    
-#define RANGE_INDEX_TO_RANGE_VALUE(idx, maxWr, N) ((float) idx / N - 0.5f) * maxWr
-    // val should be float
-#define RANGE_VALUE_TO_RANGE_INDEX(val, maxWr, N) (val / maxWr + 0.5f) * N
 
     float r_vec[Nfft];
     float min_Rvec = std::numeric_limits<float>::infinity();
