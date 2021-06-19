@@ -337,13 +337,7 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
         const CArray& rangeCompressed,
         const __nTpData* r_vec, const __nTpData min_Rvec, const __nTpData max_Rvec,
         CArray& output_image) {
-    //const float* xObs, const float* yObs, const float* zObs,
-    //        const float* range_to_phasectr, const int pulseIndex, const float* minF,
-    //        const int Npulses, const int Nrangebins, const int Nx_pix, const int Ny_pix, int Nfft,
-    //        const float x0, const float y0, const float Wx, const float Wy,
-    //        const float* r_vec, const CArray& rangeCompressed,
-    //        const float min_Rvec, const float max_Rvec, const float maxWr,
-    //        CArray& output_image) {
+
     float4 target;
     target.x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
     target.z = 0;
@@ -364,7 +358,7 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
                 //        << "(dR,phCorr)=(" << dR_val << ", " << phCorr_val << ")" << std::endl;
                 __nTpData dR_idx = RANGE_VALUE_TO_RANGE_INDEX(dR_val, SARImgParams.max_Wy_m, SARImgParams.N_fft);
                 Complex iRC_val = interp1(r_vec, SARImgParams.N_fft, rangeCompressed, dR_val, dR_idx);
-                int outputIdx = xIdx * SARImgParams.N_y_pix + yIdx;
+                //int outputIdx = xIdx * SARImgParams.N_y_pix + yIdx;
                 //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
                 output_image[xIdx * SARImgParams.N_y_pix + yIdx] += iRC_val * phCorr_val;
             }
@@ -379,23 +373,7 @@ void run_bp(const SAR_Aperture<__nTpData>& SARData,
         const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
         CArray& output_image) {
 
-    /*
-        % Determine the azimuth angles of the image pulses (radians)
-        data.AntAz = unwrap(atan2(data.AntY,data.AntX));
-        % Determine the average azimuth angle step size (radians)
-        data.deltaAz = abs(mean(diff(data.AntAz)));
-        % Determine the total azimuth angle of the aperture (radians)
-        data.totalAz = max(data.AntAz) - min(data.AntAz);
-     */
-
-    /*
-    % Display maximum scene size and resolution
-     */
-    std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << SARImgParams.max_Wy_m << " m range, "
-            << SARImgParams.max_Wx_m << " m cross-range" << std::endl;
-    std::cout << "Resolution:  " << std::fixed << std::setprecision(2) << SARImgParams.slant_rangeResolution << "m range, "
-            << SARImgParams.azimuthResolution << " m cross-range" << std::endl;
-
+    std::cout << "Running backprojection SAR focusing algorithm." << std::endl;
     /*
         % Calculate the range to every bin in the range profile (m)
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
@@ -442,6 +420,78 @@ void run_bp(const SAR_Aperture<__nTpData>& SARData,
                 r_vec, min_Rvec, max_Rvec,
                 output_image);
     }
+}
+
+template <typename __nTpData, typename __nTpParams>
+void computeDifferentialRangeAndPhaseCorrectionsMF(int pulseIndex,
+        const SAR_Aperture<__nTpData>& SARData,
+        const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
+        CArray& output_image) {
+
+    float4 target;
+    target.z = 0;
+    float delta_x = SARImgParams.Wx_m / (SARImgParams.N_x_pix - 1);
+    float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
+    //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
+    int pulse_startF_FreqIdx = pulseIndex * SARData.numRangeSamples;
+    for (int freqIdx = 0; freqIdx < SARData.numRangeSamples; freqIdx++) {
+        // TODO: Amiguate as default double and have it cast to float if appropriate for precision specifications
+        const Complex& phaseHistorySample = SARData.sampleData.data[pulse_startF_FreqIdx + freqIdx];
+        target.x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
+        for (int xIdx = 0; xIdx < SARImgParams.N_x_pix; xIdx++) {
+            target.y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
+            for (int yIdx = 0; yIdx < SARImgParams.N_y_pix; yIdx++) {
+                float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target.x) * (SARData.Ant_x.data[pulseIndex] - target.x) +
+                        (SARData.Ant_y.data[pulseIndex] - target.y) * (SARData.Ant_y.data[pulseIndex] - target.y) +
+                        (SARData.Ant_z.data[pulseIndex] - target.z) * (SARData.Ant_z.data[pulseIndex] - target.z)) - SARData.slant_range.data[pulseIndex];
+                //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
+                //int outputIdx = xIdx * SARImgParams.N_y_pix + yIdx;
+                //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
+                Complex phCorr_val = polarToComplex(1.0f, (__nTpData) ((4.0 * PI * SARData.freq.data[pulse_startF_FreqIdx + freqIdx] * dR_val) / CLIGHT));
+                output_image[xIdx * SARImgParams.N_y_pix + yIdx] += phaseHistorySample * phCorr_val;
+                target.y += delta_y;
+            }
+            target.x += delta_x;
+        }
+    }
+}
+
+template <typename __nTpData, typename __nTpParams>
+void run_mf(const SAR_Aperture<__nTpData>& SARData,
+        const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
+        CArray& output_image) {
+
+    std::cout << "Running matched filter SAR focusing algorithm." << std::endl;
+    __nTpData timeleft = 0.0f;
+
+    const Complex* range_profiles_cast = static_cast<const Complex*> (&SARData.sampleData.data[0]);
+    //mxComplexSingleClass* output_image_cast = static_cast<mxComplexSingleClass*> (output_image);
+
+    CArray range_profiles_arr(range_profiles_cast, SARData.numAzimuthSamples * SARData.numRangeSamples);
+
+    for (int pulseIndex = 0; pulseIndex < SARData.numAzimuthSamples; pulseIndex++) {
+        if (pulseIndex > 1) {// && (pulseIndex % 100) == 0) {
+            std::cout << "Pulse " << pulseIndex << " of " << SARData.numAzimuthSamples
+                    << ", " << std::setprecision(2) << timeleft << " minutes remaining" << std::endl;
+
+            computeDifferentialRangeAndPhaseCorrectionsMF(pulseIndex, SARData,
+                    SARImgParams, output_image);
+        }
+    }
+}
+
+template <typename __nTpData, typename __nTpParams>
+void focus_SAR_image(const SAR_Aperture<__nTpData>& SARData,
+        const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
+        CArray & output_image) {
+
+    // Display maximum scene size and resolution
+    std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << SARImgParams.max_Wy_m << " m range, "
+            << SARImgParams.max_Wx_m << " m cross-range" << std::endl;
+    std::cout << "Resolution:  " << std::fixed << std::setprecision(2) << SARImgParams.slant_rangeResolution << "m range, "
+            << SARImgParams.azimuthResolution << " m cross-range" << std::endl;
+
+    run_mf(SARData, SARImgParams, output_image);
 }
 
 #endif /* CPUBACKPROJECTION_HPP */

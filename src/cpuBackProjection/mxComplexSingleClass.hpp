@@ -274,12 +274,12 @@ inline mxComplexSingleClass operator*(const mxComplexSingleClass& __x, const mxC
     return __r;
 }
 
-template<typename _Tp>
-inline mxComplexSingleClass operator*(const mxComplexSingleClass& __x, const _Tp& __y) {
-    mxComplexSingleClass __r = __x;
-    __r *= __y;
-    return __r;
-}
+//template<typename _Tp>
+//inline mxComplexSingleClass operator*(const mxComplexSingleClass& __x, const _Tp& __y) {
+//    mxComplexSingleClass __r = __x;
+//    __r *= __y;
+//    return __r;
+//}
 
 template<typename _Tp>
 inline mxComplexSingleClass operator*(const _Tp& __x, const mxComplexSingleClass& __y) {

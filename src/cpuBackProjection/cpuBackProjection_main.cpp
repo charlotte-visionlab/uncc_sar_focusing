@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
     
     CArray output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    run_bp(SAR_aperture_data, SAR_image_params, output_image);
+    focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
     
     // Required parameters for output generation manually overridden by command line arguments
     SAR_image_params.output_filename = result["output"].as<std::string>();
