@@ -267,22 +267,25 @@ int read_MAT_Variables(std::string inputfile,
     return EXIT_SUCCESS;
 }
 
-template<typename __nTp>
-int writeBMPFile(const SAR_ImageFormationParameters<__nTp>& SARImgParams,
-        CArray& output_image) {
-    //unsigned char *pixels = ...;
+template<typename __nTp, typename __pTp>
+int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
+        CArray<__nTp>& output_image) {
+
     unsigned int width = SARImgParams.N_x_pix, height = SARImgParams.N_y_pix;
     std::vector<unsigned char> pixels;
     float max_val = std::accumulate(std::begin(output_image), std::end(output_image), 0.0f,
-            [](const Complex& a, const Complex & b) {
-                auto abs_a = Complex::abs(a);
-                auto abs_b = Complex::abs(b);
+            [](const Complex<__nTp>& a, const Complex<__nTp> & b) {
+                auto abs_a = Complex<__nTp>::abs(a);
+                auto abs_b = Complex<__nTp>::abs(b);
+                //auto abs_a = std::abs(a);
+                //auto abs_b = std::abs(b);
                 if (abs_a == abs_b) {
                     //return std::max(arg(a), arg(b));
                     return abs_a;
                 }
                 return std::max(abs_a, abs_b);
             });
+            
     bool flipY = false;
     bool flipX = true;
     int srcIndex;
@@ -297,9 +300,11 @@ int writeBMPFile(const SAR_ImageFormationParameters<__nTp>& SARImgParams,
             } else {
                 srcIndex = x_dstIndex * SARImgParams.N_y_pix + y_dstIndex;
             }
-            Complex& SARpixel = output_image[srcIndex];
+            Complex<__nTp>& SARpixel = output_image[srcIndex];
+            //float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
+            //        ((20 * std::log10(std::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
             float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
-                    ((20 * std::log10(Complex::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
+                    ((20 * std::log10(Complex<__nTp>::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
             unsigned char pixel = (pixelf < 0) ? 0 : (unsigned char) pixelf;
             // insert 4 copies of the pixel value
             pixels.insert(pixels.end(), 4, pixel);

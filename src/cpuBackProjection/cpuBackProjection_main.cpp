@@ -3,6 +3,7 @@
 
 #include <cxxopts.hpp>
 
+#include "uncc_sar_focusing.hpp"
 #include "cpuBackProjection.hpp"
 #include "cpuBackProjection_main.hpp"
 
@@ -66,10 +67,14 @@ void cxxopts_integration(cxxopts::Options& options) {
             ;
 }
 
+using NumericType = float;
+using ComplexType = Complex<NumericType>;
+using ComplexArrayType = CArray<NumericType>;
+
 int main(int argc, char **argv) {
-    Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
-    Complex out[8];
-    CArray data(test, 8);
+    ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
+    ComplexType out[8];
+    ComplexArrayType data(test, 8);
     std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
 
     cxxopts::Options options("cpuBackProjection", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
@@ -111,7 +116,7 @@ int main(int argc, char **argv) {
 
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
-    SAR_Aperture<PRECISION> SAR_aperture_data;
+    SAR_Aperture<NumericType> SAR_aperture_data;
     if (read_MAT_Variables(inputfile, matlab_readvar_map, SAR_aperture_data) == EXIT_FAILURE) {
         std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
         return EXIT_FAILURE;
@@ -147,11 +152,12 @@ int main(int argc, char **argv) {
 
     std::cout << SAR_aperture_data << std::endl;
 
-    SAR_ImageFormationParameters<PRECISION> SAR_image_params = SAR_ImageFormationParameters<PRECISION>::create<PRECISION>(SAR_aperture_data);
+    SAR_ImageFormationParameters<NumericType> SAR_image_params =
+            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_aperture_data);
 
     std::cout << SAR_image_params << std::endl;
 
-    CArray output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
+    ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
     focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
 

@@ -18,16 +18,14 @@ include_directories(
 add_library(${PROJECT_NAME} SHARED 
     cpuBackProjection_mex.cpp
     cpuBackProjection_fft.cpp
-    cpuBackProjection.cpp
     ${MATLAB_PROJECT_DIR}/Matlabdef.def)
-target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB})
+target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB})
 
 add_executable(cpuBackProjection_test
     cpuBackProjection_main.cpp
-    cpuBackProjection_fft.cpp
-    cpuBackProjection.cpp)
-target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} matio)
-set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
+    cpuBackProjection_fft.cpp)
+target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
+#set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 # 32-bit or 64-bit mex
 if(WIN32)
