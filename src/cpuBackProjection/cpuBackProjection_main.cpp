@@ -66,8 +66,6 @@ void cxxopts_integration(cxxopts::Options& options) {
             ;
 }
 
-typedef float PRECISION;
-
 int main(int argc, char **argv) {
     Complex test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
     Complex out[8];
@@ -91,20 +89,20 @@ int main(int argc, char **argv) {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-//        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
-//        std::string fileprefix = Sandia_RioGrande_fileprefix;
-//        std::string filepostfix = Sandia_RioGrande_filepostfix;
+        //        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        //        std::string fileprefix = Sandia_RioGrande_fileprefix;
+        //        std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
         //        std::string filepostfix = Sandia_Farms_filepostfix;
-//        ss << std::setfill('0') << std::setw(2) << file_idx;
+        //        ss << std::setfill('0') << std::setw(2) << file_idx;
 
         initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
-                int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-                std::string fileprefix = GOTCHA_fileprefix;
-                std::string filepostfix = GOTCHA_filepostfix;
-                ss << std::setfill('0') << std::setw(3) << azimuth;
+        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+        std::string fileprefix = GOTCHA_fileprefix;
+        std::string filepostfix = GOTCHA_filepostfix;
+        ss << std::setfill('0') << std::setw(3) << azimuth;
 
         initialize_GOTCHA_MATRead(matlab_readvar_map);
 
@@ -136,6 +134,9 @@ int main(int argc, char **argv) {
         std::cout << "Requested polarity channel " << polarity << " is not available." << std::endl;
         return EXIT_FAILURE;
     }
+    if (SAR_aperture_data.sampleData.shape.size() > 2) {
+        SAR_aperture_data.format_GOTCHA = false;
+    }
     if (!SAR_aperture_data.format_GOTCHA) {
         // the dimensional index of the polarity index in the 
         // multi-dimensional array (for Sandia SPH SAR data)
@@ -149,39 +150,15 @@ int main(int argc, char **argv) {
     SAR_ImageFormationParameters<PRECISION> SAR_image_params = SAR_ImageFormationParameters<PRECISION>::create<PRECISION>(SAR_aperture_data);
 
     std::cout << SAR_image_params << std::endl;
-    
+
     CArray output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
     focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
-    
+
     // Required parameters for output generation manually overridden by command line arguments
     SAR_image_params.output_filename = result["output"].as<std::string>();
     SAR_image_params.dyn_range_dB = result["dynrange"].as<float>();
 
     writeBMPFile(SAR_image_params, output_image);
-    //SAR_Focus_Image(SAR_aperture_data, SAR_image_params);
-    // forward fft
-    //fft(data);
-    fftw(data);
-    int N = 8;
-    //    std::cout << "st " << sizeof (test) << std::endl;
-
-    // http://www.fftw.org/fftw3_doc/Complex-numbers.html
-    // Structure must be only two numbers in the order real, imag
-    // to be binary compatible with the C99 complex type
-
-    //    std::cout << "fft" << std::endl;
-    //    for (int i = 0; i < 8; ++i) {
-    //        std::cout << data[i] << std::endl;
-    //    }
-
-    // inverse fft
-    //ifft(data);
-    ifftw(data);
-
-    //    std::cout << std::endl << "ifft" << std::endl;
-    //    for (int i = 0; i < 8; ++i) {
-    //        std::cout << data[i] << std::endl;
-    //    }
     return EXIT_SUCCESS;
 }
