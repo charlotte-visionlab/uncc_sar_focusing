@@ -41,18 +41,18 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
         const __nTp* r_vec, const __nTp min_Rvec, const __nTp max_Rvec,
         CArray<__nTp>& output_image) {
 
-    float4 target;
-    target.z = 0;
+    float target_x, target_y, target_z;
+    target_z = 0;
     float delta_x = SARImgParams.Wx_m / (SARImgParams.N_x_pix - 1);
     float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
-    target.x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
+    target_x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
     for (int xIdx = 0; xIdx < SARImgParams.N_x_pix; xIdx++) {
-        target.y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
+        target_y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
         for (int yIdx = 0; yIdx < SARImgParams.N_y_pix; yIdx++) {
-            float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target.x) * (SARData.Ant_x.data[pulseIndex] - target.x) +
-                    (SARData.Ant_y.data[pulseIndex] - target.y) * (SARData.Ant_y.data[pulseIndex] - target.y) +
-                    (SARData.Ant_z.data[pulseIndex] - target.z) * (SARData.Ant_z.data[pulseIndex] - target.z)) - SARData.slant_range.data[pulseIndex];
+            float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target_x) * (SARData.Ant_x.data[pulseIndex] - target_x) +
+                    (SARData.Ant_y.data[pulseIndex] - target_y) * (SARData.Ant_y.data[pulseIndex] - target_y) +
+                    (SARData.Ant_z.data[pulseIndex] - target_z) * (SARData.Ant_z.data[pulseIndex] - target_z)) - SARData.slant_range.data[pulseIndex];
             //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
             if (dR_val > min_Rvec && dR_val < max_Rvec) {
                 // TODO: Amiguate as default double and have it cast to float if appropriate for precision specifications
@@ -66,9 +66,9 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
                 //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
                 output_image[xIdx * SARImgParams.N_y_pix + yIdx] += iRC_val * phCorr_val;
             }
-            target.y += delta_y;
+            target_y += delta_y;
         }
-        target.x += delta_x;
+        target_x += delta_x;
     }
 }
 
@@ -132,18 +132,18 @@ void computeDifferentialRangeAndPhaseCorrectionsMF(int pulseIndex,
         const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
         CArray<__nTp>& output_image) {
 
-    float4 target;
-    target.z = 0;
+    float target_x, target_y, target_z;
+    target_z = 0;
     float delta_x = SARImgParams.Wx_m / (SARImgParams.N_x_pix - 1);
     float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
-    target.x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
+    target_x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
     for (int xIdx = 0; xIdx < SARImgParams.N_x_pix; xIdx++) {
-        target.y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
+        target_y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
         for (int yIdx = 0; yIdx < SARImgParams.N_y_pix; yIdx++) {
-            float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target.x) * (SARData.Ant_x.data[pulseIndex] - target.x) +
-                    (SARData.Ant_y.data[pulseIndex] - target.y) * (SARData.Ant_y.data[pulseIndex] - target.y) +
-                    (SARData.Ant_z.data[pulseIndex] - target.z) * (SARData.Ant_z.data[pulseIndex] - target.z)) - SARData.slant_range.data[pulseIndex];
+            float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target_x) * (SARData.Ant_x.data[pulseIndex] - target_x) +
+                    (SARData.Ant_y.data[pulseIndex] - target_y) * (SARData.Ant_y.data[pulseIndex] - target_y) +
+                    (SARData.Ant_z.data[pulseIndex] - target_z) * (SARData.Ant_z.data[pulseIndex] - target_z)) - SARData.slant_range.data[pulseIndex];
             //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
             //int outputIdx = xIdx * SARImgParams.N_y_pix + yIdx;
             //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
@@ -155,9 +155,9 @@ void computeDifferentialRangeAndPhaseCorrectionsMF(int pulseIndex,
                 Complex<__nTp> phCorr_val = Complex<__nTp>::polar(1.0f, (__nTp) ((4.0 * PI * SARData.freq.data[pulse_startF_FreqIdx + freqIdx] * dR_val) / CLIGHT));
                 output_image[xIdx * SARImgParams.N_y_pix + yIdx] += phaseHistorySample * phCorr_val;
             }
-            target.y += delta_y;
+            target_y += delta_y;
         }
-        target.x += delta_x;
+        target_x += delta_x;
     }
 }
 

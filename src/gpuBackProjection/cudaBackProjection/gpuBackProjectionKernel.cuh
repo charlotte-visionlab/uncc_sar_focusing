@@ -20,8 +20,8 @@
 
 #define MAKERADIUS(xpixel,ypixel, xa,ya,za) sqrtf(CAREFUL_AMINUSB_SQ(xpixel, xa) + CAREFUL_AMINUSB_SQ(ypixel, ya) + __fmul_rn(za, za))
 
-#define CLIGHT 299792458.0f /* c: speed of light, m/s */
-#define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
+//#define CLIGHT 299792458.0f /* c: speed of light, m/s */
+//#define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
 
 __device__ float2 expjf(float in);
 __device__ float2 expjf_div_2(float in);
@@ -48,8 +48,8 @@ __global__ void backprojection_loop(float2* full_image,
         int PROJ_LENGTH,
         int X_OFFSET, int Y_OFFSET,
         float C__4_DELTA_FREQ, float* PI_4_F0__CLIGHT,
-        float left, float bottom, float min_eff_idx, float4 * platform_info,
-        float * debug_effective_idx, float * debug_2, float * x_mat, float * y_mat,
+        float left, float bottom, float4* platform_info,
+        float* debug_effective_idx, float* debug_2, float* x_mat, float* y_mat,
         float rmin, float rmax) {
 
     float2 subimage;
@@ -195,6 +195,47 @@ float2 expjf_div_2(float in) {
     out.x = (2.0f - tb) / tb; /* Real */
     out.y = (2.0f * t) / tb; /* Imag */
     return out;
+}
+
+template<typename __nTp>
+int cuda_SARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *output_image) {
+
+    SAR_Aperture<__nTp> sar_aperture_data;
+    SAR_ImageFormationParameters<__nTp> sar_image_params;
+    import_MATLABMexArguments(nrhs, prhs, sar_aperture_data, sar_image_params);
+
+    std::cout << sar_aperture_data << std::endl;
+
+    sar_aperture_data.polarity_channel = 1;
+    if (sar_aperture_data.sampleData.shape.size() > 2) {
+        sar_aperture_data.format_GOTCHA = false;
+    }
+    // the dimensional index of the polarity index in the 
+    // multi-dimensional array (for Sandia SPH SAR data)
+    if (!sar_aperture_data.format_GOTCHA) {
+        sar_aperture_data.polarity_dimension = 2;
+    }
+
+    initialize_SAR_Aperture_Data(sar_aperture_data);
+
+    std::cout << sar_aperture_data << std::endl;
+
+    CArray<__nTp> output_image_arr(sar_image_params.N_y_pix * sar_image_params.N_x_pix);
+
+    std::cout << sar_image_params << std::endl;
+    sar_image_params.update(sar_aperture_data);
+    //SAR_ImageFormationParameters<float> sar_image_params = SAR_ImageFormationParameters<float>::create<float>(sar_aperture_data);
+    std::cout << sar_image_params << std::endl;
+
+    cuda_focus_SAR_image(sar_aperture_data, sar_image_params, output_image_arr);
+
+    for (int i = 0; i < output_image_arr.size(); i++) {
+        //std::cout << "I(" << i << ") = " << output_image_arr[i] << std::endl;
+        output_image[i]._M_real = output_image_arr[i].real();
+        output_image[i]._M_imag = output_image_arr[i].imag();
+    }
+    
+    return EXIT_SUCCESS;
 }
 
 #endif /* GPUBACKPROJECTIONKERNEL_CUH */

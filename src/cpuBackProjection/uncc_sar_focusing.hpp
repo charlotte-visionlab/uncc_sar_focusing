@@ -29,7 +29,8 @@
 
 #define CLIGHT 299792458.0 /* c: speed of light, m/s */
 //#define CLIGHT 299792458.0f /* c: speed of light, m/s */
-#define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
+#define PI 3.141592653589793   /* pi, accurate to 6th place in single precision */
+//#define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
 
 template<typename __nTp> 
 using Complex = unccComplex<__nTp>;
@@ -39,39 +40,6 @@ using Complex = unccComplex<__nTp>;
 
 template<typename __nTp>
 using CArray = std::valarray<Complex<__nTp> >;
-
-class float2 {
-public:
-    float x, y;
-};
-
-class float3 : public float2 {
-public:
-    float z;
-};
-
-class float4 : public float3 {
-public:
-    float w;
-};
-
-//template<typename _numTp>
-//class Point2 {
-//public:
-//    _numTp x, y;
-//};
-//
-//template<typename _numTp>
-//class Point3 : public Point2<_numTp> {
-//public:
-//    _numTp z;
-//};
-//
-//template<typename _numTp>
-//class Point4 : public Point3<_numTp> {
-//public:
-//    _numTp w;
-//};
 
 template<typename __numTp>
 struct simpleMatrix {
@@ -188,7 +156,6 @@ public:
 
 template <typename _numTp>
 inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>& c) {
-    int NUMVALS = 10;
     output << "sampleData" << c.sampleData << std::endl;
     output << "Ant_x" << c.Ant_x << std::endl;
     output << "Ant_y" << c.Ant_y << std::endl;
@@ -476,6 +443,7 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_ImageFormationPa
     output << "deltaR_m (slant range resolution)= {" << c.slant_rangeResolution << "}" << std::endl;
     output << "deltaX_m (ground range resolution)= {" << c.ground_rangeResolution << "}" << std::endl;
     output << "deltaY_m (cross-range/x-axis resolution) = {" << c.azimuthResolution << "}" << std::endl;
+    return output;
 }
 
 /***

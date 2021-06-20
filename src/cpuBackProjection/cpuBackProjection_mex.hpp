@@ -93,7 +93,7 @@ int import_MATLABArgumentComplex(const mxArray* matArg, simpleMatrix<__Tp>& sMat
 }
 
 template<typename __Tp1, typename __Tp2>
-int importMATLABMexArguments(int nrhs, const mxArray* prhs[],
+int import_MATLABMexArguments(int nrhs, const mxArray* prhs[],
         SAR_Aperture<__Tp1>& sar_aperture_data,
         SAR_ImageFormationParameters<__Tp2>& sar_image_params) {
 
@@ -123,7 +123,7 @@ int runSARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *out
 
     SAR_Aperture<__nTp> sar_aperture_data;
     SAR_ImageFormationParameters<__nTp> sar_image_params;
-    importMATLABMexArguments(nrhs, prhs, sar_aperture_data, sar_image_params);
+    import_MATLABMexArguments(nrhs, prhs, sar_aperture_data, sar_image_params);
 
     std::cout << sar_aperture_data << std::endl;
 
@@ -155,6 +155,8 @@ int runSARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *out
         output_image[i]._M_real = output_image_arr[i].real();
         output_image[i]._M_imag = output_image_arr[i].imag();
     }
+    
+    return EXIT_SUCCESS;
 }
 
 #endif /* CPUBACKPROJECTION_MEX_HPP */

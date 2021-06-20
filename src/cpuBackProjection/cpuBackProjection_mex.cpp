@@ -12,6 +12,9 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     if (!mxIsComplex(prhs[0])) {
         mexErrMsgIdAndTxt("mexFunction::Input 0 is not complex-valued",
                 "Input 0 must be complex-valued.\n");
+        plhs[0] = mxCreateNumericMatrix(0, 0,
+                mxDOUBLE_CLASS, mxCOMPLEX);
+        return;
     }
 
     int N_x_pix = (int) mxGetScalar(prhs[ARG_N_X_PIX]);
@@ -26,7 +29,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         // I must unfortunately cast the memory to a class to operate on the data using
         // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
         Complex<double>* output_image_cast = reinterpret_cast<Complex<double>*> (output_image);
-        
+
         runSARFocusingAlgorithm<double>(nrhs, prhs, output_image_cast);
     } else {
         std::cout << "Running in single precision mode." << std::endl;
@@ -37,7 +40,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         // I must unfortunately cast the memory to a class to operate on the data using
         // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
         Complex<float>* output_image_cast = reinterpret_cast<Complex<float>*> (output_image);
-        
+
         runSARFocusingAlgorithm<float>(nrhs, prhs, output_image_cast);
     }
 }
