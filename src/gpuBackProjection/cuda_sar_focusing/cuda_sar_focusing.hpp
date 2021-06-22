@@ -30,7 +30,7 @@
 
 #define ZEROCOPY      0
 
-class CUDADevice_ArrayMappedMemory { //: public CUDADevice_ArrayMappedMemoryBase {
+class CUDADevice_ArrayMappedMemory {
 public:
     typedef std::shared_ptr<CUDADevice_ArrayMappedMemory> Ptr;
     void* host_mem;
@@ -41,7 +41,6 @@ public:
     }
 
     CUDADevice_ArrayMappedMemory(void* _host_mem, size_t _size) : dev_mem(nullptr), size(_size), host_mem(_host_mem) {
-        std::cout << "host_mem = " << host_mem << std::endl;
     }
 
     virtual ~CUDADevice_ArrayMappedMemory() {
@@ -53,6 +52,14 @@ public:
 
     bool isEmpty() {
         return (dev_mem == nullptr && host_mem == nullptr) || size == 0;
+    }
+
+    template<typename __Tp> __Tp* getDeviceMemPointer() {
+        return (__Tp*) dev_mem;
+    }
+
+    template<typename __Tp> __Tp* getHostMemPointer() {
+        return (__Tp*) dev_mem;
     }
 
     friend std::ostream& operator<<(std::ostream& output, const CUDADevice_ArrayMappedMemory& gpu_mm);
@@ -67,6 +74,7 @@ inline std::ostream& operator<<(std::ostream& output, const CUDADevice_ArrayMapp
 class GPUMemoryManager {
 public:
     typedef std::shared_ptr<GPUMemoryManager> Ptr;
+    typedef std::unordered_map<std::string, CUDADevice_ArrayMappedMemory>::iterator mmap_iterator;
 
     int deviceId;
     int blockwidth, blockheight;
@@ -81,33 +89,50 @@ public:
         }
         CUDADevice_ArrayMappedMemory gpu_mem(nullptr, size_in_bytes);
         MY_CUDA_SAFE_CALL(cudaMalloc(&gpu_mem.dev_mem, size_in_bytes));
-        return EXIT_SUCCESS;
-    }
-    
-    int copyToDevice(std::string name, void* src_data, size_t size_in_bytes) {
-        if (gpu_mmap.find(name) != gpu_mmap.end()) {
-            std::cout << "copyToDevice::Failure to export data with the name \"" + name + "\". The name already exists in the GPU memory map." << std::endl;
-            return EXIT_FAILURE;
-        }
-        if (!src_data) {
-            std::cout << "copyToDevice::Failure to copy data from host source address; it is a nullptr." << std::endl;
-            return EXIT_FAILURE;
-        }
-        CUDADevice_ArrayMappedMemory gpu_mem(src_data, size_in_bytes);
-        MY_CUDA_SAFE_CALL(cudaMalloc(&gpu_mem.dev_mem, size_in_bytes));
-        MY_CUDA_SAFE_CALL(cudaMemcpy(gpu_mem.dev_mem, src_data, size_in_bytes, cudaMemcpyHostToDevice));
         gpu_mmap[name] = gpu_mem;
         return EXIT_SUCCESS;
     }
 
-    int copyFromDevice(std::string name, void* dst_data, size_t size_in_bytes) {
+    int copyToDevice(std::string name, void* src_data, size_t size_in_bytes) {
+        if (gpu_mmap.find(name) == gpu_mmap.end()) {
+            if (createOnDevice(name, size_in_bytes) == EXIT_FAILURE) {
+                return EXIT_FAILURE;
+            }
+        }
         std::unordered_map<std::string, CUDADevice_ArrayMappedMemory>::iterator it = gpu_mmap.find(name);
+        CUDADevice_ArrayMappedMemory& gpu_mem = it->second;
+        if (!src_data) {
+            std::cout << "copyToDevice::Failure to copy data from host source address; it is a nullptr." << std::endl;
+            return EXIT_FAILURE;
+        }
+        gpu_mem.host_mem = src_data;
+        MY_CUDA_SAFE_CALL(cudaMemcpy(gpu_mem.dev_mem, src_data, size_in_bytes, cudaMemcpyHostToDevice));
+        return EXIT_SUCCESS;
+    }
+
+    template<typename __Tp> __Tp* getHostMemPointer(std::string name) {
+        mmap_iterator it = gpu_mmap.find(name);
+        if (it == gpu_mmap.end()) {
+            std::cout << "getHostMemPointer::Failure to find GPU entry with the name \"" + name + "\". It does not exist in the GPU memory map." << std::endl;
+        }
+        return (__Tp*) it->second.host_mem;
+    }
+
+    template<typename __Tp> __Tp* getDeviceMemPointer(std::string name) {
+        mmap_iterator it = gpu_mmap.find(name);
+        if (it == gpu_mmap.end()) {
+            std::cout << "getDeviceMemPointer::Failure to find GPU entry with the name \"" + name + "\". It does not exist in the GPU memory map." << std::endl;
+        }
+        return (__Tp*) it->second.dev_mem;
+    }
+
+    int copyFromDevice(std::string name, void* dst_data, size_t size_in_bytes) {
+        mmap_iterator it = gpu_mmap.find(name);
         if (it == gpu_mmap.end()) {
             std::cout << "copyFromDevice::Failure to find GPU entry with the name \"" + name + "\". It does not exist in the GPU memory map." << std::endl;
             return EXIT_FAILURE;
         }
         CUDADevice_ArrayMappedMemory& gpu_mem = it->second;
-        ;
         if (!dst_data) {
             std::cout << "copyFromDevice::Failure to copy. The host destination address is a nullptr." << std::endl;
             return EXIT_FAILURE;
@@ -125,13 +150,12 @@ public:
     }
 
     int freeGPUMemory(std::string name) {
-        std::unordered_map<std::string, CUDADevice_ArrayMappedMemory>::iterator it = gpu_mmap.find(name);
+        mmap_iterator it = gpu_mmap.find(name);
         if (it == gpu_mmap.end()) {
             std::cout << "freeGPUMemory::Failure to free. GPU memory with the name \"" + name + "\" does not exist in the GPU memory map." << std::endl;
             return EXIT_FAILURE;
         }
         CUDADevice_ArrayMappedMemory& gpu_mem = it->second;
-        ;
         if (!gpu_mem.dev_mem) {
             std::cout << "freeGPUMemory::Failure to free. GPU memory with the name \"" + name + "\" has device memory address = nullptr." << std::endl;
         }
@@ -144,13 +168,12 @@ public:
     }
 
     int freeHostMemory(std::string name) {
-        std::unordered_map<std::string, CUDADevice_ArrayMappedMemory>::iterator it = gpu_mmap.find(name);
+        mmap_iterator it = gpu_mmap.find(name);
         if (it == gpu_mmap.end()) {
             std::cout << "freeHostMemory::Failure to free. Host memory with the name \"" + name + "\" does not exist in the GPU memory map." << std::endl;
             return EXIT_FAILURE;
         }
         CUDADevice_ArrayMappedMemory& gpu_mem = it->second;
-        ;
         if (!gpu_mem.host_mem) {
             std::cout << "freeHostMemory::Failure to free. Host memory with the name \"" + name + "\" has host memory address = nullptr." << std::endl;
         }
@@ -198,7 +221,6 @@ public:
 inline std::ostream& operator<<(std::ostream& output, const GPUMemoryManager& gpu_mm) {
     std::cout << "GPU-Host memory map: " << std::endl;
     for (const auto it : gpu_mm.gpu_mmap) {
-        //const CUDADevice_ArrayMappedMemory<void *>& gpu_mem = reinterpret_cast<const CUDADevice_ArrayMappedMemory<void *>&> (it.second);
         output << "\tmap[\"" << it.first << "\"] = " << it.second << std::endl;
     }
     return output;
@@ -206,7 +228,7 @@ inline std::ostream& operator<<(std::ostream& output, const GPUMemoryManager& gp
 
 // future contents of gpu_sar_focusing_fft.hpp
 #include <cufft.h>
-#include <cufftw.h>
+//#include <cufftw.h>
 
 // On the cufftComplex data type:
 // from: https://stackoverflow.com/questions/13535182/copying-data-to-cufftcomplex-data-struct
@@ -262,25 +284,9 @@ float2* format_complex_to_columns(const Complex<__nTp>* a, int width_orig, int h
     return out;
 }
 
-float4* format_x_y_z_r(const float* x, const float* y, const float* z, const float* r, const int size) {
-    float4* out = (float4*) malloc(size * sizeof (float4));
-    int i;
-    for (i = 0; i < size; i++) {
-        out[i].x = x[i];
-        out[i].y = y[i];
-        out[i].z = z[i];
-        out[i].w = r[i];
-    }
-    return out;
-}
-
 // GPU initialization
 
 int initialize_GPUMATLAB(int& deviceId) {
-
-    // Initialize the MathWorks GPU API
-    mxInitGPU();
-
     // This will pick the best possible CUDA capable device
     //    devID = findCudaDevice(argc, (const char **)argv); 
     if (deviceId == -1) {
@@ -295,7 +301,6 @@ template<typename __nTp1, typename __nTp2>
 int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
         const SAR_ImageFormationParameters<__nTp2>& sar_img_params,
         GPUMemoryManager& cuda_res) {
-
     initialize_GPUMATLAB(cuda_res.deviceId);
     cuda_res.blockwidth = BLOCKWIDTH;
     cuda_res.blockheight = BLOCKHEIGHT;
@@ -306,15 +311,14 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     MY_CUDA_SAFE_CALL(cudaGetDeviceProperties(&cuda_res.props, cuda_res.deviceId));
     //MY_CUDA_SAFE_CALL(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, deviceId));
     //MY_CUDA_SAFE_CALL(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, deviceId));
-    std::cout << "GPU Device " << cuda_res.deviceId << ": \"" << _ConvertSMVer2ArchName(cuda_res.props.major, cuda_res.props.minor)
-            << "\" NVIDIA architecture with compute capability " << cuda_res.props.major << "." << cuda_res.props.minor << std::endl;
     std::cout << "Device " << cuda_res.deviceId << ": \"" << cuda_res.props.name
-            << "\" with compute " << cuda_res.props.major << "." << cuda_res.props.minor << " capability" << std::endl;
+            << " has NVIDIA \"" << _ConvertSMVer2ArchName(cuda_res.props.major, cuda_res.props.minor) << "architecture"
+            << "\" with compute capability " << cuda_res.props.major << "." << cuda_res.props.minor << "." << std::endl;
     std::cout << "CUDA parameters not provided. Auto-selecting:" << std::endl
             << "\tdevice                " << cuda_res.deviceId << std::endl
             << "\tblockwidth            " << cuda_res.blockwidth << std::endl
-            << "\tblockheight           " << cuda_res.blockheight << std::endl
-            << "\ttexturePitchAlignment " << cuda_res.props.texturePitchAlignment << std::endl;
+            << "\tblockheight           " << cuda_res.blockheight << std::endl;
+            //<< "\ttexturePitchAlignment " << cuda_res.props.texturePitchAlignment << std::endl;
 
 #if ZEROCOPY
     // We will want ZEROCOPY code for Xavier and newer architecture platforms
@@ -322,22 +326,20 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     MY_CUDA_SAFE_CALL(cudaSetDeviceFlags(cudaDeviceMapHost));
 #endif
     // We will want UNIFIED MEMORY code for Maxwell architecture platforms
-
-    // Set up platform data texture
-    float4* trans_tex_platform_info = format_x_y_z_r(&sar_data.Ant_x.data[0],
-            &sar_data.Ant_y.data[0],
-            &sar_data.Ant_z.data[0],
-            &sar_data.slant_range.data[0],
-            sar_data.numAzimuthSamples);
-    
-    cuda_res.copyToDevice("platform_positions", trans_tex_platform_info,
-            sar_data.numAzimuthSamples * sizeof (float4));
-
+    cuda_res.copyToDevice("Ant_x", (void *) &sar_data.Ant_x.data[0],
+            sar_data.Ant_x.data.size() * sizeof (sar_data.Ant_x.data[0]));
+    cuda_res.copyToDevice("Ant_y", (void *) &sar_data.Ant_y.data[0],
+            sar_data.Ant_y.data.size() * sizeof (sar_data.Ant_y.data[0]));
+    cuda_res.copyToDevice("Ant_z", (void *) &sar_data.Ant_z.data[0],
+            sar_data.Ant_z.data.size() * sizeof (sar_data.Ant_z.data[0]));
+    cuda_res.copyToDevice("slant_range", (void *) &sar_data.slant_range.data[0],
+            sar_data.slant_range.data.size() * sizeof (sar_data.slant_range.data[0]));
     cuda_res.copyToDevice("sampleData", (void *) &sar_data.sampleData.data[0],
             sar_data.sampleData.data.size() * sizeof (sar_data.sampleData.data[0]));
-
     cuda_res.copyToDevice("startF", (void *) &sar_data.startF.data[0],
             sar_data.startF.data.size() * sizeof (sar_data.startF.data[0]));
+    cuda_res.copyToDevice("sar_image_params", (void *) &sar_img_params,
+            sizeof (sar_img_params));
 
     int num_img_bytes = 2 * sizeof (float) * sar_img_params.N_x_pix * sar_img_params.N_y_pix;
 #if ZEROCOPY
@@ -348,7 +350,7 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     MY_CUDA_SAFE_CALL(cudaHostGetDevicePointer((void **) &device_pointer,
             (void *) cuda_res.out_image, 0));
 #else
-    cuda_res.createOnDevice("output_image", num_img_bytes); 
+    cuda_res.createOnDevice("output_image", num_img_bytes);
 #endif
     return EXIT_SUCCESS;
 }
@@ -368,8 +370,11 @@ int finalize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
 #else
     cuda_res.freeGPUMemory("output_image");
 #endif
-
-    cuda_res.freeAllResources("platform_positions");
+    cuda_res.freeGPUMemory("sar_image_params");
+    cuda_res.freeGPUMemory("Ant_x");
+    cuda_res.freeGPUMemory("Ant_y");
+    cuda_res.freeGPUMemory("Ant_z");
+    cuda_res.freeGPUMemory("slant_range");
     cuda_res.freeGPUMemory("startF");
     cuda_res.freeGPUMemory("sampleData");
 
@@ -377,6 +382,8 @@ int finalize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
 
     return EXIT_SUCCESS;
 }
+
+//#include "cufftShift_1D_IP.cuh"
 
 template <typename __nTp, typename __nTpParams>
 void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
@@ -400,33 +407,47 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     }
     std::cout << cuda_res << std::endl;
 
-    __nTp c__4_delta_freq = CLIGHT / (4.0 * sar_data.deltaF.data[0]);
-    __nTp pi_4_f0__clight = (PI * 4.0 * sar_data.startF.data[0]) / CLIGHT;
+    cufft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft);
+    
+    cufftShift_1D<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft);
+    
+    //__nTp c__4_delta_freq = CLIGHT / (4.0 * sar_data.deltaF.data[0]);
+    //__nTp pi_4_f0__clight = (PI * 4.0 * sar_data.startF.data[0]) / CLIGHT;
+    //__nTp r_start_pre = (c__4_delta_freq * (float) sar_data.numRangeSamples / ((float) sar_data.numRangeSamples - 1.0f));
     //convert_f0(start_frequencies, Npulses);
-    __nTp delta_x = sar_image_params.Wx_m / (sar_image_params.N_x_pix - 1);
-    __nTp delta_y = sar_image_params.Wy_m / (sar_image_params.N_y_pix - 1);
-    __nTp left = sar_image_params.x0_m - sar_image_params.Wx_m / 2;
-    __nTp bottom = sar_image_params.y0_m - sar_image_params.Wy_m / 2;
+    
+    __nTp delta_x_m_per_pix = sar_image_params.Wx_m / (sar_image_params.N_x_pix - 1);
+    __nTp delta_y_m_per_pix = sar_image_params.Wy_m / (sar_image_params.N_y_pix - 1);
+    __nTp left_m = sar_image_params.x0_m - sar_image_params.Wx_m / 2;
+    __nTp bottom_m = sar_image_params.y0_m - sar_image_params.Wy_m / 2;
+
     // Set up and run the kernel
     dim3 dimBlock(cuda_res.blockwidth, cuda_res.blockheight, 1);
     dim3 dimGrid(sar_image_params.N_x_pix / cuda_res.blockwidth,
             sar_image_params.N_y_pix / cuda_res.blockheight);
-    //float r_start_pre = (c__4_delta_freq * (float) total_proj_length / ((float) total_proj_length - 1.0f));
 
     clock_t c0, c1;
     c0 = clock();
 
 #if ZEROCOPY
-    backprojection_loop << <dimGrid, dimBlock>>>(device_pointer, Npulses, Ny_pix,
+    backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<float2>("sampleData"),
+            sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
             delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
-            c__4_delta_freq, cuda_resources.device_start_frequencies,
-            left, bottom, cuda_res.trans_tex_platform_info, 0, 0);
+            c__4_delta_freq, cuda_res.getDeviceMemPointer<float>("startF"),
+            left, bottom, cuda_res.getDeviceMemPointer<float4>("platform_positions"), 0, 0,
+            cuda_res.getDeviceMemPointer<float2>("output_image"));
 #else
-    //    backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.out_image,
-    //            sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
-    //            delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
-    //            c__4_delta_freq, cuda_res.device_start_frequencies,
-    //            left, bottom, cuda_res.device_tex_platform_info, 0, 0);
+    backprojection_loop<__nTp> << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<float2>("sampleData"),
+            sar_data.numRangeSamples, sar_data.numAzimuthSamples,
+            delta_x_m_per_pix, delta_y_m_per_pix,
+            left_m, bottom_m, 0, 0,
+            cuda_res.getDeviceMemPointer<__nTp>("Ant_x"),
+            cuda_res.getDeviceMemPointer<__nTp>("Ant_y"),
+            cuda_res.getDeviceMemPointer<__nTp>("Ant_z"),
+            cuda_res.getDeviceMemPointer<__nTp>("slant_range"),
+            cuda_res.getDeviceMemPointer<__nTp>("startF"),
+            cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params"),
+            cuda_res.getDeviceMemPointer<float2>("output_image"));
 #endif
     c1 = clock();
     printf("INFO: CUDA-mex kernel took %f s\n", (float) (c1 - c0) / CLOCKS_PER_SEC);

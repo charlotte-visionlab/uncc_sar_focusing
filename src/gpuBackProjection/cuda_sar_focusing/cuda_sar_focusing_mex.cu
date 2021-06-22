@@ -1,3 +1,6 @@
+// this declaration needs to be in any C++ compiled target for CPU
+#define CUDAFUNCTION __host__ __device__
+
 // Standard Library includes
 #include <stdio.h>  /* printf */
 #include <time.h>
@@ -6,10 +9,9 @@
 #include <mex.h>  
 #include <gpu/mxGPUArray.h>
 
-#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
-#include "../../cpuBackProjection/cpuBackProjection_mex.hpp"
-#include "gpuBackProjectionKernel.cuh"
-#include "gpu_sar_focusing.hpp"
+#include "cuda_BackProjectionKernels.cuh"
+#include "cuda_sar_focusing_mex.cuh"
+#include "cuda_sar_focusing.hpp"
 
 void mexFunction(int nlhs, /* number of LHS (output) arguments */
         mxArray* plhs[], /* array of mxArray pointers to outputs */
@@ -28,17 +30,20 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
     int N_x_pix = (int) mxGetScalar(prhs[ARG_N_X_PIX]);
     int N_y_pix = (int) mxGetScalar(prhs[ARG_N_Y_PIX]);
 
+    // Initialize the MathWorks GPU API
+    mxInitGPU();
+
     if (mxIsDouble(prhs[0])) {
-        //        std::cout << "Running in double precision mode." << std::endl;
-        //        plhs[0] = mxCreateNumericMatrix(N_y_pix, N_x_pix,
-        //                mxDOUBLE_CLASS, mxCOMPLEX);
-        //        mxComplexDouble* output_image = mxGetComplexDoubles(plhs[0]);
-        //        // MATLAB mxComplexDouble is only a C struct with *zero* arithmetic support.
-        //        // I must unfortunately cast the memory to a class to operate on the data using
-        //        // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
-        //        Complex<double>* output_image_cast = reinterpret_cast<Complex<double>*> (output_image);
-        //
-        //        runSARFocusingAlgorithm<double>(nrhs, prhs, output_image_cast);
+                std::cout << "Running in double precision mode." << std::endl;
+        plhs[0] = mxCreateNumericMatrix(N_y_pix, N_x_pix,
+                mxDOUBLE_CLASS, mxCOMPLEX);
+        mxComplexDouble* output_image = mxGetComplexDoubles(plhs[0]);
+        // MATLAB mxComplexDouble is only a C struct with *zero* arithmetic support.
+        // I must unfortunately cast the memory to a class to operate on the data using
+        // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
+        Complex<double>* output_image_cast = reinterpret_cast<Complex<double>*> (output_image);
+
+        cuda_SARFocusingAlgorithm<double>(nrhs, prhs, output_image_cast);
     } else {
         std::cout << "Running in single precision mode." << std::endl;
         plhs[0] = mxCreateNumericMatrix(N_y_pix, N_x_pix,

@@ -1,4 +1,6 @@
 
+#define CUDAFUNCTION 
+
 #include "uncc_sar_focusing.hpp"
 #include "cpuBackProjection.hpp"
 #include "cpuBackProjection_mex.hpp"
@@ -30,7 +32,7 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
         Complex<double>* output_image_cast = reinterpret_cast<Complex<double>*> (output_image);
 
-        runSARFocusingAlgorithm<double>(nrhs, prhs, output_image_cast);
+        cpu_SARFocusingAlgorithm<double>(nrhs, prhs, output_image_cast);
     } else {
         std::cout << "Running in single precision mode." << std::endl;
         plhs[0] = mxCreateNumericMatrix(N_y_pix, N_x_pix,
@@ -41,6 +43,6 @@ void mexFunction(int nlhs, /* number of LHS (output) arguments */
         // Object-Oriented Programming abstraction. *NOT A DESIRABLE CAST*
         Complex<float>* output_image_cast = reinterpret_cast<Complex<float>*> (output_image);
 
-        runSARFocusingAlgorithm<float>(nrhs, prhs, output_image_cast);
+        cpu_SARFocusingAlgorithm<float>(nrhs, prhs, output_image_cast);
     }
 }

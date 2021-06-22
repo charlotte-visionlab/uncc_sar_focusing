@@ -1,3 +1,6 @@
+// this declaration needs to be in any C++ compiled target for CPU
+#define CUDAFUNCTION
+
 #include "cpuBackProjection_fft.hpp"
 //
 // Note: FFTW uses completely different functions and libraries

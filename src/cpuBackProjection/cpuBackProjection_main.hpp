@@ -11,12 +11,74 @@
 #include <complex>
 #include <numeric>
 
+#include <cxxopts.hpp>
+
 #include <matio.h>
 
 #define LOADBMP_IMPLEMENTATION
 #include <loadbmp.h>
 
 #include "cpuBackProjection.hpp"
+
+std::string HARDCODED_SARDATA_PATH = "/home/arwillis/sar/";
+
+std::string Sandia_RioGrande_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Rio_Grande_UUR_SAND2021-1834_O/SPH/PHX1T03_PS0008_PT0000";
+// index here is 2 digit file index [00,...,10]
+std::string Sandia_RioGrande_filepostfix = "";
+std::string Sandia_Farms_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Farms_UUR_SAND2021-1835_O/SPH/0506P19_PS0020_PT0000";
+// index here is 2 digit file index [00,...,09]
+std::string Sandia_Farms_filepostfix = "_N03_M1";
+
+// azimuth=[1,...,360] for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/DATA/pass1/HH/data_3dsar_pass1_az";
+// index here is 3 digit azimuth [001,...,360]
+std::string GOTCHA_filepostfix = "_HH";
+
+void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*>& matlab_readvar_map) {
+    matlab_readvar_map["data.fp"] = NULL;
+    matlab_readvar_map["data.freq"] = NULL;
+    matlab_readvar_map["data.x"] = NULL;
+    matlab_readvar_map["data.y"] = NULL;
+    matlab_readvar_map["data.z"] = NULL;
+    matlab_readvar_map["data.r0"] = NULL;
+    matlab_readvar_map["data.th"] = NULL;
+    matlab_readvar_map["data.phi"] = NULL;
+    matlab_readvar_map["data.af.r_correct"] = NULL;
+    matlab_readvar_map["data.af.ph_correct"] = NULL;
+}
+
+void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
+    matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
+    matlab_readvar_map["sph_MATData.preamble.ADF"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.ChirpRate"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.ChirpRateDelta"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.SampleData"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.StartF"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.x"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.y"] = NULL;
+    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.z"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
+}
+
+// For details see: https://github.com/jarro2783/cxxopts
+
+void cxxopts_integration(cxxopts::Options& options) {
+
+    options.add_options()
+            ("i,input", "Input file", cxxopts::value<std::string>())
+            //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
+            ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
+            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
+            ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
+            ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
+            ("h,help", "Print usage")
+            ;
+}
 
 template<typename _numTp>
 int import_MATVector(matvar_t* matVar, SimpleMatrix<_numTp>& sMat) {
@@ -51,7 +113,6 @@ int import_MATMatrixReal(matvar_t* matVar, SimpleMatrix<_realTp>& sMat) {
         sMat.shape.push_back(matVar->dims[dimIdx]);
         totalsize = totalsize * sizes[ndims];
     }
-    size_t stride = matVar->data_size;
 
     if (matVar->isComplex) {
         std::cout << "import_MATMatrixReal::Matrix is complex-valued!" << std::endl;
@@ -269,7 +330,7 @@ int read_MAT_Variables(std::string inputfile,
 
 template<typename __nTp, typename __pTp>
 int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
-        CArray<__nTp>& output_image) {
+        const CArray<__nTp>& output_image, const std::string& output_filename) {
 
     unsigned int width = SARImgParams.N_x_pix, height = SARImgParams.N_y_pix;
     std::vector<unsigned char> pixels;
@@ -300,7 +361,7 @@ int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
             } else {
                 srcIndex = x_dstIndex * SARImgParams.N_y_pix + y_dstIndex;
             }
-            Complex<__nTp>& SARpixel = output_image[srcIndex];
+            const Complex<__nTp>& SARpixel = output_image[srcIndex];
             //float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
             //        ((20 * std::log10(std::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
             float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
@@ -311,12 +372,14 @@ int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
         }
     }
 
-    unsigned int err = loadbmp_encode_file(SARImgParams.output_filename.c_str(),
+    unsigned int err = loadbmp_encode_file(output_filename.c_str(),
             &pixels[0], width, height, LOADBMP_RGBA);
 
     if (err) {
         std::cout << "writeBMPFile::LoadBMP error = " << err << " when saving image to file " << std::endl;
+        return EXIT_FAILURE;
     }
+    return EXIT_SUCCESS;
 }
 #endif /* CPUBACKPROJECTION_MAIN_HPP */
 

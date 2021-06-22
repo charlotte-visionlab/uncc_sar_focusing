@@ -85,7 +85,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 
     /* call GPU kernel for addition */
     gpuAddKernel << < dimGridImg, dimBlockImg >>>(d_A, d_B, d_C, Am, An);
-    cudaThreadSynchronize();
+    cudaDeviceSynchronize();
 
     /* copy result from device */
     cudaMemcpy(C, d_C, Am * An * sizeof (double), cudaMemcpyDeviceToHost);

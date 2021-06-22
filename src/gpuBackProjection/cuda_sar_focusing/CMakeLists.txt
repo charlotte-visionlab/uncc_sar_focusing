@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
-project(cudaBackProjection LANGUAGES CXX CUDA)
+project(cuda_sar_focusing LANGUAGES CXX CUDA)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -10,6 +10,7 @@ find_package(CUDA)
 set(CUDA_NVCC_FLAGS -Xcompiler -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
 include_directories(
+    ../../include
     ${CUDA_INCLUDE_DIRS}
     /usr/local/cuda/samples/common/inc
     /usr/local/cuda/targets/x86_64-linux/include/
@@ -18,10 +19,14 @@ include_directories(
     ${Matlab_ROOT_DIR}/sys/cuda/glnxa64/cuda/include
 )
 
-cuda_compile(${PROJECT_NAME} ${PROJECT_NAME}.cu SHARED)
-add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}} ${PROJECT_NAME}.cu ${MATLAB_PROJECT_DIR}/Matlabdef.def)
+add_library(${PROJECT_NAME} SHARED cuda_sar_focusing_mex.cu ${MATLAB_PROJECT_DIR}/Matlabdef.def)
 target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
+
+add_executable(cuda_sar_focusing_cmd
+    cuda_sar_focusing_main.cu)
+target_link_libraries(cuda_sar_focusing_cmd ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
+#set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 # 32-bit or 64-bit mex
 if(WIN32)

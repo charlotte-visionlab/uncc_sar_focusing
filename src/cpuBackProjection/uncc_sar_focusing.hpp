@@ -51,7 +51,7 @@ public:
 
     int nelem() {
         return (shape.size() == 0) ? 0 :
-                std::accumulate(begin(shape), end(shape), 1, std::multiplies<int>());// / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
+                std::accumulate(begin(shape), end(shape), 1, std::multiplies<int>()); // / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
     }
 
     bool isEmpty() {
@@ -61,7 +61,7 @@ public:
     SimpleMatrix::Ptr create() {
         return std::make_shared<SimpleMatrix>();
     }
-    
+
     template <typename _Tp>
     friend std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp> &c);
 
@@ -195,6 +195,7 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
 #define numValuesPerPolarity(sMat, pDim) sMat.nelem()/((sMat.shape.size() >= pDim && pDim != -1) ? sMat.shape[pDim] : 1)
 
 // TODO: Make this a class function for SAR_Aperture
+
 template<typename _numTp>
 int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
 
@@ -214,8 +215,8 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
 
     // populate frequency sample locations for every pulse if not already available
     // also populates startF and deltaF in some cases
-    if (numValuesPerPolarity(aperture.freq,polDim) != numSARSamples) {
-        std::cout << "initializeSARFocusingVariables::Found " << numValuesPerPolarity(aperture.freq,polDim)
+    if (numValuesPerPolarity(aperture.freq, polDim) != numSARSamples) {
+        std::cout << "initializeSARFocusingVariables::Found " << numValuesPerPolarity(aperture.freq, polDim)
                 << " frequency measurements and need " << numSARSamples << " measurements. Augmenting frequency data for SAR focusing." << std::endl;
         if (!aperture.freq.isEmpty() && aperture.freq.shape[0] == aperture.numRangeSamples) {
             std::cout << "Assuming constant frequency samples for each SAR pulse." << std::endl;
@@ -368,7 +369,6 @@ template<typename _numTp>
 class SAR_ImageFormationParameters {
 public:
     int pol; // What polarization to image (HH,HV,VH,VV)
-    std::string output_filename; // Filename to write output image
     // Define image parameters here
     int N_fft; // Number of samples in FFT
     int N_x_pix; // Number of samples in x direction
@@ -384,11 +384,12 @@ public:
     _numTp ground_rangeResolution; // Ground range resolution in the down-range/x direction (m)
     _numTp azimuthResolution; // Resolution in the cross-range/x direction (m)
 
-    SAR_ImageFormationParameters() : N_fft(512), N_x_pix(512), N_y_pix(512), x0_m(0), y0_m(0), dyn_range_dB(70) {
+    CUDAFUNCTION SAR_ImageFormationParameters() : N_fft(512), N_x_pix(512), N_y_pix(512), 
+            x0_m(0), y0_m(0), dyn_range_dB(70) {
     };
 
     template <typename __argTp>
-    void update(const SAR_Aperture<__argTp> aperture) {
+    CUDAFUNCTION void update(const SAR_Aperture<__argTp> aperture) {
         // Determine the maximum scene size of the image (m)
         // max down-range/fast-time/y-axis extent of image (m)
         max_Wy_m = CLIGHT / (2.0 * aperture.mean_deltaF);
@@ -401,7 +402,7 @@ public:
     }
 
     template <typename __myTp, typename __argTp>
-    static SAR_ImageFormationParameters create(const SAR_Aperture<__argTp> aperture) {
+    CUDAFUNCTION static SAR_ImageFormationParameters create(const SAR_Aperture<__argTp> aperture) {
         // call the constructor
         SAR_ImageFormationParameters<__myTp> image_params;
 
@@ -431,7 +432,7 @@ public:
         return image_params;
     }
 
-    virtual ~SAR_ImageFormationParameters() {
+    CUDAFUNCTION ~SAR_ImageFormationParameters() {
     };
 
     template <typename _Tp>

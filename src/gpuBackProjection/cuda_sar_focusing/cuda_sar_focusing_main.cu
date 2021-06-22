@@ -1,14 +1,15 @@
-#include <iomanip>
-#include <sstream>
-
-#include <cxxopts.hpp>
-
 // this declaration needs to be in any C++ compiled target for CPU
-#define CUDAFUNCTION
+#define CUDAFUNCTION __host__ __device__
 
-#include "uncc_sar_focusing.hpp"
-#include "cpuBackProjection.hpp"
-#include "cpuBackProjection_main.hpp"
+// Standard Library includes
+#include <stdio.h>  /* printf */
+#include <time.h>
+
+#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
+#include "../../cpuBackProjection/cpuBackProjection_main.hpp"
+
+#include "cuda_BackProjectionKernels.cuh"
+#include "cuda_sar_focusing.hpp"
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
@@ -102,7 +103,7 @@ int main(int argc, char **argv) {
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
+    cuda_focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();

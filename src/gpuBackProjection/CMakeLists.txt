@@ -6,5 +6,5 @@ set( CUDA_ARCH_FLAGS "-gencode=arch=compute_35,code=sm_35 \
 -gencode=arch=compute_80,code=sm_80")
 
 add_subdirectory(cudaAdd)
-add_subdirectory(cudaBackProjection)
+add_subdirectory(cuda_sar_focusing)
 

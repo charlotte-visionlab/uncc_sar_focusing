@@ -119,7 +119,7 @@ int import_MATLABMexArguments(int nrhs, const mxArray* prhs[],
 }
 
 template<typename __nTp>
-int runSARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *output_image) {
+int cpu_SARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *output_image) {
 
     SAR_Aperture<__nTp> sar_aperture_data;
     SAR_ImageFormationParameters<__nTp> sar_image_params;

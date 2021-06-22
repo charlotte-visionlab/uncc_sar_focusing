@@ -24,7 +24,7 @@ target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} ${FF
 add_executable(cpuBackProjection_test
     cpuBackProjection_main.cpp
     cpuBackProjection_fft.cpp)
-target_link_libraries(cpuBackProjection_test ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
+target_link_libraries(cpuBackProjection_test ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
 #set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 # 32-bit or 64-bit mex
