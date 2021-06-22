@@ -19,6 +19,7 @@
 #include <iostream>
 #include <iterator>
 #include <cmath>
+#include <memory>
 #include <numeric>
 #include <string>
 //#include <unordered_map>
@@ -32,7 +33,7 @@
 #define PI 3.141592653589793   /* pi, accurate to 6th place in single precision */
 //#define PI 3.14159265359f   /* pi, accurate to 6th place in single precision */
 
-template<typename __nTp> 
+template<typename __nTp>
 using Complex = unccComplex<__nTp>;
 
 //template<typename __nTp> 
@@ -42,31 +43,33 @@ template<typename __nTp>
 using CArray = std::valarray<Complex<__nTp> >;
 
 template<typename __numTp>
-struct simpleMatrix {
+struct SimpleMatrix {
 public:
     std::vector<int> shape;
     std::vector<__numTp> data;
+    typedef std::shared_ptr<SimpleMatrix> Ptr;
 
-    int numValues(int polarityIdx = -1) {
-        if (polarityIdx > shape.size()) {
-            polarityIdx = -1;
-        }
+    int nelem() {
         return (shape.size() == 0) ? 0 :
-                std::accumulate(begin(shape), end(shape), 1, std::multiplies<int>()) / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
+                std::accumulate(begin(shape), end(shape), 1, std::multiplies<int>());// / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
     }
 
     bool isEmpty() {
         return shape.size() == 0;
     }
 
+    SimpleMatrix::Ptr create() {
+        return std::make_shared<SimpleMatrix>();
+    }
+    
     template <typename _Tp>
-    friend std::ostream& operator<<(std::ostream& output, const simpleMatrix<__numTp> &c);
+    friend std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp> &c);
 
 };
 
 template <typename __numTp>
-inline std::ostream& operator<<(std::ostream& output, const simpleMatrix<__numTp>& sMat) {
-    int NUMVALS = 10;
+inline std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp>& sMat) {
+    int MAX_NUM_VARS_PRINTED = 10;
     std::string dimsStr;
     if (!sMat.shape.empty()) {
         dimsStr = std::accumulate(sMat.shape.begin() + 1, sMat.shape.end(),
@@ -76,43 +79,44 @@ inline std::ostream& operator<<(std::ostream& output, const simpleMatrix<__numTp
     }
     output << "[" << dimsStr << "] = {"; \
     typename std::vector<__numTp>::const_iterator i;
-    for (i = sMat.data.begin(); i != sMat.data.end() && i != sMat.data.begin() + NUMVALS; ++i) {
+    for (i = sMat.data.begin(); i != sMat.data.end() && i != sMat.data.begin() + MAX_NUM_VARS_PRINTED; ++i) {
         output << *i << ", ";
     }
-    output << ((sMat.data.size() > NUMVALS) ? " ..." : "") << " }";
+    output << ((sMat.data.size() > MAX_NUM_VARS_PRINTED) ? " ..." : "") << " }";
     return output;
 }
 
 template<typename _numTp>
 class SAR_Aperture {
 public:
+    typedef std::shared_ptr<SAR_Aperture> Ptr;
 
     bool format_GOTCHA;
 
     // GOTCHA + Sandia Fields
-    simpleMatrix<Complex<_numTp>> sampleData;
+    SimpleMatrix<Complex<_numTp>> sampleData;
     //int numPulses;
     //int numRangeSamples;
-    simpleMatrix<_numTp> Ant_x;
-    simpleMatrix<_numTp> Ant_y;
-    simpleMatrix<_numTp> Ant_z;
+    SimpleMatrix<_numTp> Ant_x;
+    SimpleMatrix<_numTp> Ant_y;
+    SimpleMatrix<_numTp> Ant_z;
 
     // GOTCHA-Only Fields
-    simpleMatrix<_numTp> freq;
-    simpleMatrix<_numTp> slant_range;
-    simpleMatrix<_numTp> theta;
-    simpleMatrix<_numTp> phi;
+    SimpleMatrix<_numTp> freq;
+    SimpleMatrix<_numTp> slant_range;
+    SimpleMatrix<_numTp> theta;
+    SimpleMatrix<_numTp> phi;
 
     struct {
-        simpleMatrix<_numTp> r_correct;
-        simpleMatrix<_numTp> ph_correct;
+        SimpleMatrix<_numTp> r_correct;
+        SimpleMatrix<_numTp> ph_correct;
     } af;
 
     // Sandia-ONLY Fields
-    simpleMatrix<_numTp> ADF;
-    simpleMatrix<_numTp> startF;
-    simpleMatrix<_numTp> chirpRate;
-    simpleMatrix<_numTp> chirpRateDelta;
+    SimpleMatrix<_numTp> ADF;
+    SimpleMatrix<_numTp> startF;
+    SimpleMatrix<_numTp> chirpRate;
+    SimpleMatrix<_numTp> chirpRateDelta;
 
     // Fields set automatically by program computations or manually via user input arguments
     // 1 - HH, 2 -HV, 3 - VH, 4 - VV
@@ -125,17 +129,17 @@ public:
     int numRangeSamples;
     int numAzimuthSamples;
     int numPolarities;
-    simpleMatrix<_numTp> bandwidth;
-    simpleMatrix<_numTp> deltaF;
+    SimpleMatrix<_numTp> bandwidth;
+    SimpleMatrix<_numTp> deltaF;
 
     _numTp mean_startF;
     _numTp mean_deltaF;
     _numTp mean_bandwidth;
 
-    simpleMatrix<_numTp> Ant_Az;
-    simpleMatrix<_numTp> Ant_deltaAz;
-    simpleMatrix<_numTp> Ant_El;
-    simpleMatrix<_numTp> Ant_deltaEl;
+    SimpleMatrix<_numTp> Ant_Az;
+    SimpleMatrix<_numTp> Ant_deltaAz;
+    SimpleMatrix<_numTp> Ant_El;
+    SimpleMatrix<_numTp> Ant_deltaEl;
     _numTp mean_Ant_El;
     _numTp mean_deltaAz;
     _numTp mean_deltaEl;
@@ -149,6 +153,10 @@ public:
 
     virtual ~SAR_Aperture() {
     };
+
+    SAR_Aperture::Ptr create() {
+        return std::make_shared<SAR_Aperture>();
+    }
 
     template <typename _Tp>
     friend std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_Tp> &c);
@@ -184,8 +192,9 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
     return output;
 }
 
-// TODO: Make this a class function for SAR_Aperture
+#define numValuesPerPolarity(sMat, pDim) sMat.nelem()/((sMat.shape.size() >= pDim && pDim != -1) ? sMat.shape[pDim] : 1)
 
+// TODO: Make this a class function for SAR_Aperture
 template<typename _numTp>
 int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
 
@@ -194,19 +203,19 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
     aperture.numPolarities = (aperture.sampleData.shape.size() > 2) ? aperture.sampleData.shape[2] : 1;
 
     int numSARSamples = aperture.numRangeSamples * aperture.numAzimuthSamples;
-
+    const int polDim = aperture.polarity_dimension;
     // determine if there are sufficient antenna phase center values to focus the SAR image data
-    if (aperture.Ant_x.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples ||
-            aperture.Ant_y.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples ||
-            aperture.Ant_z.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+    if (numValuesPerPolarity(aperture.Ant_x, polDim) != aperture.numAzimuthSamples ||
+            numValuesPerPolarity(aperture.Ant_y, polDim) != aperture.numAzimuthSamples ||
+            numValuesPerPolarity(aperture.Ant_z, polDim) != aperture.numAzimuthSamples) {
         std::cout << "initializeSARFocusingVariables::Not enough antenna positions available to focus the selected SAR data." << std::endl;
         return EXIT_FAILURE;
     }
 
     // populate frequency sample locations for every pulse if not already available
     // also populates startF and deltaF in some cases
-    if (aperture.freq.numValues(aperture.polarity_dimension) != numSARSamples) {
-        std::cout << "initializeSARFocusingVariables::Found " << aperture.freq.numValues(aperture.polarity_dimension)
+    if (numValuesPerPolarity(aperture.freq,polDim) != numSARSamples) {
+        std::cout << "initializeSARFocusingVariables::Found " << numValuesPerPolarity(aperture.freq,polDim)
                 << " frequency measurements and need " << numSARSamples << " measurements. Augmenting frequency data for SAR focusing." << std::endl;
         if (!aperture.freq.isEmpty() && aperture.freq.shape[0] == aperture.numRangeSamples) {
             std::cout << "Assuming constant frequency samples for each SAR pulse." << std::endl;
@@ -219,12 +228,12 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
             _numTp bandwidth = maxFreq - minFreq;
             _numTp deltaF = std::abs(aperture.freq.data[1] - aperture.freq.data[0]);
             bool fill_startF = false;
-            if (aperture.startF.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+            if (numValuesPerPolarity(aperture.startF, polDim) != aperture.numAzimuthSamples) {
                 fill_startF = true;
                 aperture.startF.shape.push_back(aperture.numAzimuthSamples);
             }
             bool fill_deltaF = false;
-            if (aperture.deltaF.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+            if (numValuesPerPolarity(aperture.deltaF, polDim) != aperture.numAzimuthSamples) {
                 fill_deltaF = true;
                 aperture.deltaF.shape.push_back(aperture.numAzimuthSamples);
             }
@@ -272,8 +281,8 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
     }
 
     // populate slant_range to target phase center for every pulse if not already available
-    if (aperture.slant_range.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
-        std::cout << "initializeSARFocusingVariables::Found " << aperture.slant_range.numValues(aperture.polarity_dimension)
+    if (numValuesPerPolarity(aperture.slant_range, polDim) != aperture.numAzimuthSamples) {
+        std::cout << "initializeSARFocusingVariables::Found " << numValuesPerPolarity(aperture.slant_range, polDim)
                 << " slant range measurements and need " << aperture.numAzimuthSamples << " measurements. Augmenting slant range data for SAR focusing." << std::endl;
         aperture.slant_range.shape.clear();
         aperture.slant_range.data.clear();
@@ -286,7 +295,7 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
     }
 
     // populate deltaF if not already available
-    if (aperture.deltaF.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+    if (numValuesPerPolarity(aperture.deltaF, polDim) != aperture.numAzimuthSamples) {
         _numTp deltaF = std::abs(aperture.freq.data[1] - aperture.freq.data[0]);
         for (int azIdx = 0; azIdx < aperture.numAzimuthSamples; ++azIdx) {
             for (int freqIdx = 0; freqIdx < aperture.numRangeSamples; freqIdx++) {
@@ -308,7 +317,7 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
     _numTp sum_bandwidth = std::accumulate(aperture.bandwidth.data.begin(), aperture.bandwidth.data.end(), 0.0);
     aperture.mean_bandwidth = sum_bandwidth / aperture.bandwidth.data.size();
 
-    if (aperture.Ant_Az.numValues(aperture.polarity_dimension) != aperture.numAzimuthSamples) {
+    if (numValuesPerPolarity(aperture.Ant_Az, polDim) != aperture.numAzimuthSamples) {
         aperture.Ant_Az.shape.clear();
         aperture.Ant_Az.data.clear();
         aperture.Ant_Az.shape.push_back(aperture.numAzimuthSamples);

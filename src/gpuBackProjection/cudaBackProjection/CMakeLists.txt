@@ -10,7 +10,9 @@ find_package(CUDA)
 set(CUDA_NVCC_FLAGS -Xcompiler -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
 include_directories(
+    ${CUDA_INCLUDE_DIRS}
     /usr/local/cuda/samples/common/inc
+    /usr/local/cuda/targets/x86_64-linux/include/
     ${Matlab_INCLUDE_DIRS}
     ${Matlab_ROOT_DIR}/toolbox/parallel/gpu/extern/include
     ${Matlab_ROOT_DIR}/sys/cuda/glnxa64/cuda/include
@@ -18,7 +20,7 @@ include_directories(
 
 cuda_compile(${PROJECT_NAME} ${PROJECT_NAME}.cu SHARED)
 add_library(${PROJECT_NAME} SHARED ${${PROJECT_NAME}} ${PROJECT_NAME}.cu ${MATLAB_PROJECT_DIR}/Matlabdef.def)
-target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${CUDA_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
 
 # 32-bit or 64-bit mex

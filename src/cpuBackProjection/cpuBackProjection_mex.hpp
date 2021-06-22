@@ -33,7 +33,7 @@
 #define ARG_WY_M 12
 
 template<typename __Tp>
-int import_MATLABArgumentReal(const mxArray* matArg, simpleMatrix<__Tp>& sMat) {
+int import_MATLABArgumentReal(const mxArray* matArg, SimpleMatrix<__Tp>& sMat) {
     const mwSize ndims = mxGetNumberOfDimensions(matArg);
     const mwSize *dims = mxGetDimensions(matArg);
     int totalsize = 1;
@@ -63,7 +63,7 @@ int import_MATLABArgumentReal(const mxArray* matArg, simpleMatrix<__Tp>& sMat) {
 }
 
 template<typename __Tp>
-int import_MATLABArgumentComplex(const mxArray* matArg, simpleMatrix<__Tp>& sMat) {
+int import_MATLABArgumentComplex(const mxArray* matArg, SimpleMatrix<__Tp>& sMat) {
     const mwSize ndims = mxGetNumberOfDimensions(matArg);
     const mwSize *dims = mxGetDimensions(matArg);
     int totalsize = 1;

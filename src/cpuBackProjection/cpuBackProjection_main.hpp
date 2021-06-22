@@ -19,7 +19,7 @@
 #include "cpuBackProjection.hpp"
 
 template<typename _numTp>
-int import_MATVector(matvar_t* matVar, simpleMatrix<_numTp>& sMat) {
+int import_MATVector(matvar_t* matVar, SimpleMatrix<_numTp>& sMat) {
     int ndims = matVar->rank;
     int sizes[ndims];
     int totalsize = 1;
@@ -42,7 +42,7 @@ int import_MATVector(matvar_t* matVar, simpleMatrix<_numTp>& sMat) {
 }
 
 template<typename _realTp>
-int import_MATMatrixReal(matvar_t* matVar, simpleMatrix<_realTp>& sMat) {
+int import_MATMatrixReal(matvar_t* matVar, SimpleMatrix<_realTp>& sMat) {
     int ndims = matVar->rank;
     int sizes[ndims];
     int totalsize = 1;
@@ -73,7 +73,7 @@ int import_MATMatrixReal(matvar_t* matVar, simpleMatrix<_realTp>& sMat) {
 }
 
 template<typename _complexTp>
-int import_MATMatrixComplex(matvar_t* matVar, simpleMatrix<_complexTp>& sMat) {
+int import_MATMatrixComplex(matvar_t* matVar, SimpleMatrix<_complexTp>& sMat) {
     int ndims = matVar->rank;
     //int sizes[ndims];
     int totalsize = 1;

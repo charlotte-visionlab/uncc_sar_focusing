@@ -8,8 +8,6 @@
 #ifndef GPUBACKPROJECTIONKERNEL_CUH
 #define GPUBACKPROJECTIONKERNEL_CUH
 
-#define mexPrintf printf
-
 #define REAL(vec) (vec.x)
 #define IMAG(vec) (vec.y)
 
@@ -29,10 +27,11 @@ __device__ float2 expjf_div_2(float in);
 /* Globals and externs */
 
 /* Complex textures containing range profiles */
-texture<float2, 2, cudaReadModeElementType> tex_projections;
+//texture<float2, cudaTextureType2D, cudaReadModeElementType> tex_projections;
+//texture<float2, cudaTextureType1D, cudaReadModeElementType> texRef;
 
 /* 4-elem. textures for x, y, z, r0 */
-texture<float4, 1, cudaReadModeElementType> tex_platform_info;
+//texture<float4, cudaTextureType1D, cudaReadModeElementType> tex_platform_info;
 
 /* Main kernel.
  *
@@ -49,7 +48,6 @@ __global__ void backprojection_loop(float2* full_image,
         int X_OFFSET, int Y_OFFSET,
         float C__4_DELTA_FREQ, float* PI_4_F0__CLIGHT,
         float left, float bottom, float4* platform_info,
-        float* debug_effective_idx, float* debug_2, float* x_mat, float* y_mat,
         float rmin, float rmax) {
 
     float2 subimage;
@@ -96,7 +94,7 @@ __global__ void backprojection_loop(float2* full_image,
                (ypixel - platform.y) +
                platform.z * platform.z);*/
         float R = MAKERADIUS(xpos_m, ypos_m, platform.x, platform.y, platform.z);
-        if (abs(xpos_m) < 0.1 && abs(ypos_m) < 0.1) {
+        if (abs(xpos_m) < 0.5 && abs(ypos_m) < 0.5) {
             //printf("Nl1_dr is: %f\n", Nl1_dr);
             printf("pulse=%d (x,y)=(%f,%f) platform(x,y,z)=(%f,%f,%f) R0=%f R=%f \n", pulseNum, xpos_m, ypos_m, 
                     platform.x, platform.y, platform.z, platform.w, R);
@@ -120,7 +118,7 @@ __global__ void backprojection_loop(float2* full_image,
         /*texel = tex2D(tex_projections, 
                 0.5f+effective_idx, 0.5f+(float)proj_num);*/
         // offset textures
-        texel = tex2D(tex_projections, 0.5f + (float) pulseNum, 0.5f + effective_idx);
+        //texel = tex2D(tex_projections, 0.5f + (float) pulseNum, 0.5f + effective_idx);
 
         /* Scale "texel" by "pixel_scale".
            The RHS of these 2 lines just implement complex multiplication.
