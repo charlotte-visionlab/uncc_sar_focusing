@@ -9,9 +9,8 @@
 #include <mex.h>  
 #include <gpu/mxGPUArray.h>
 
-#include "cuda_BackProjectionKernels.cuh"
-#include "cuda_sar_focusing_mex.cuh"
 #include "cuda_sar_focusing.hpp"
+#include "cuda_sar_focusing_mex.cuh"
 
 void mexFunction(int nlhs, /* number of LHS (output) arguments */
         mxArray* plhs[], /* array of mxArray pointers to outputs */

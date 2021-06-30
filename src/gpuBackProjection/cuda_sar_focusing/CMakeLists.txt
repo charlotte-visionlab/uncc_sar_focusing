@@ -7,7 +7,7 @@ set( CMAKE_VERBOSE_MAKEFILE ON)
 find_package(CUDA)
 
 #set(CUDA_NVCC_FLAGS -Xcompiler -fPIC -use_fast_math -gencode=arch=compute_20,code="sm_20,compute_20" --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
-set(CUDA_NVCC_FLAGS -Xcompiler -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
+set(CUDA_NVCC_FLAGS -Xcompiler -no-pie -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
 include_directories(
     ../../include
@@ -25,7 +25,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
 
 add_executable(cuda_sar_focusing_cmd
     cuda_sar_focusing_main.cu)
-target_link_libraries(cuda_sar_focusing_cmd ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
+target_link_libraries(cuda_sar_focusing_cmd -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
 #set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 # 32-bit or 64-bit mex

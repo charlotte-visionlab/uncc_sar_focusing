@@ -8,10 +8,15 @@
 #ifndef GPU_SAR_FOCUSING_HPP
 #define GPU_SAR_FOCUSING_HPP
 
-// CUDA includes
-#include <helper_cuda.h>
 #include <memory>
 #include <unordered_map>
+#include <iostream>
+#include <numeric>
+
+// CUDA includes
+#include <helper_cuda.h>
+
+#include "cuda_BackProjectionKernels.cuh"
 
 #define MY_CUDA_SAFE_CALL_NO_SYNC( call) {                                   \
     cudaError err = call;                                                    \
@@ -141,11 +146,13 @@ public:
             std::cout << "copyFromDevice::Failure to copy. The device source address is a nullptr." << std::endl;
             return EXIT_FAILURE;
         }
-        if (gpu_mem.size != size_in_bytes) {
-            std::cout << "copyFromDevice::Failure to copy. The destination address size different from the device source size." << std::endl;
+        if (size_in_bytes > gpu_mem.size) {
+            std::cout << "copyFromDevice::Failure to copy. The destination address memory size is larger than the device source size." << std::endl;
             return EXIT_FAILURE;
+        } else if (size_in_bytes < gpu_mem.size) {
+            std::cout << "copyFromDevice::Warning. The destination address memory size is smaller than the device source size." << std::endl;
         }
-        MY_CUDA_SAFE_CALL(cudaMemcpy(dst_data, gpu_mem.dev_mem, gpu_mem.size, cudaMemcpyDeviceToHost));
+        MY_CUDA_SAFE_CALL(cudaMemcpy(dst_data, gpu_mem.dev_mem, size_in_bytes, cudaMemcpyDeviceToHost));
         return EXIT_SUCCESS;
     }
 
@@ -240,22 +247,28 @@ inline std::ostream& operator<<(std::ostream& output, const GPUMemoryManager& gp
 // with the real part followed by imaginary part.
 //
 
-void cufft_engine(cufftComplex *dev_signal, int N_fft, int DIR) {
+void cufft_engine(cufftComplex *dev_signal, int N_fft, int N_batch, int DIR) {
     // CUFFT plan
     cufftHandle plan;
-    cufftPlan1d(&plan, N_fft, CUFFT_C2C, 1);
-
+    if (cufftPlan1d(&plan, N_fft, CUFFT_C2C, N_batch) != CUFFT_SUCCESS) {
+        std::cout << "CUFFT error: Plan creation failed" << std::endl;
+        return;
+    }
+    //int istride = 1, ostride = 1;
+    //int o
+    //cufftPlanMany(&plan, 1, N_fft, NULL, istride, idist, 
+    //    NULL, ostride, odist, CUFFT_C2C, N_batch);
     // Transform signal and kernel
     printf("Transforming signal cufftExecC2C\n");
     cufftExecC2C(plan, (cufftComplex *) dev_signal, (cufftComplex *) dev_signal, DIR);
 }
 
-void cufft(cufftComplex *dev_signal, int N_fft) {
-    cufft_engine(dev_signal, N_fft, CUFFT_FORWARD);
+void cufft(cufftComplex *dev_signal, int N_fft, int N_batch) {
+    cufft_engine(dev_signal, N_fft, N_batch, CUFFT_FORWARD);
 }
 
-void icufft(cufftComplex *dev_signal, int N_fft) {
-    cufft_engine(dev_signal, N_fft, CUFFT_INVERSE);
+void cuifft(cufftComplex *dev_signal, int N_fft, int N_batch) {
+    cufft_engine(dev_signal, N_fft, N_batch, CUFFT_INVERSE);
 }
 
 // functions that format data for export to GPU (perhaps not required)
@@ -318,7 +331,7 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
             << "\tdevice                " << cuda_res.deviceId << std::endl
             << "\tblockwidth            " << cuda_res.blockwidth << std::endl
             << "\tblockheight           " << cuda_res.blockheight << std::endl;
-            //<< "\ttexturePitchAlignment " << cuda_res.props.texturePitchAlignment << std::endl;
+    //<< "\ttexturePitchAlignment " << cuda_res.props.texturePitchAlignment << std::endl;
 
 #if ZEROCOPY
     // We will want ZEROCOPY code for Xavier and newer architecture platforms
@@ -406,16 +419,31 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         return;
     }
     std::cout << cuda_res << std::endl;
+    int numSamples = sar_data.sampleData.data.size();
+    //    Complex<__nTp> devResult1[numSamples];
+    //    cuda_res.copyFromDevice("sampleData", &devResult1[0], numSamples * sizeof (Complex<__nTp>));
+    //    for (int i = 0; i < 10; i++) {
+    //        std::cout << "sampleData[" << i << "]=" << std::setprecision(7) << devResult1[i] << std::endl;
+    //    }
 
-    cufft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft);
-    
+    cuifft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
+
+    //    Complex<__nTp> devResult[numSamples];
+    //    cuda_res.copyFromDevice("sampleData", &devResult[0], numSamples * sizeof (Complex<__nTp>));
+    //    for (int i = 0; i < 10; i++) {
+    //        std::cout << "ifft(sampleData)[" << i << "]=" << std::setprecision(7) << devResult[i]/sar_image_params.N_fft << std::endl;
+    //    }
     cufftShift_1D<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft);
-    
+    //    Complex<__nTp> devResult1[numSamples];
+    //    cuda_res.copyFromDevice("sampleData", &devResult1[0], numSamples * sizeof (Complex<__nTp>));
+    //    for (int i = 0; i < 10; i++) {
+    //        std::cout << "fftshift(ifft(sampleData))[" << i << "]=" << std::setprecision(7) << devResult1[i]/sar_image_params.N_fft << std::endl;
+    //    }
     //__nTp c__4_delta_freq = CLIGHT / (4.0 * sar_data.deltaF.data[0]);
     //__nTp pi_4_f0__clight = (PI * 4.0 * sar_data.startF.data[0]) / CLIGHT;
     //__nTp r_start_pre = (c__4_delta_freq * (float) sar_data.numRangeSamples / ((float) sar_data.numRangeSamples - 1.0f));
     //convert_f0(start_frequencies, Npulses);
-    
+
     __nTp delta_x_m_per_pix = sar_image_params.Wx_m / (sar_image_params.N_x_pix - 1);
     __nTp delta_y_m_per_pix = sar_image_params.Wy_m / (sar_image_params.N_y_pix - 1);
     __nTp left_m = sar_image_params.x0_m - sar_image_params.Wx_m / 2;

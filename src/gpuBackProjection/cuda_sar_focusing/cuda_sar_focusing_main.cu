@@ -8,7 +8,6 @@
 #include "../../cpuBackProjection/uncc_sar_focusing.hpp"
 #include "../../cpuBackProjection/cpuBackProjection_main.hpp"
 
-#include "cuda_BackProjectionKernels.cuh"
 #include "cuda_sar_focusing.hpp"
 
 using NumericType = float;

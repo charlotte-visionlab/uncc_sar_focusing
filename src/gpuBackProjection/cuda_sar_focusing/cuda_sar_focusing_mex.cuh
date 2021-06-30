@@ -14,10 +14,8 @@
 #ifndef CUDABACKPROJECTION_MEX_CUH
 #define CUDABACKPROJECTION_MEX_CUH
 
-#ifndef NO_MATLAB
 #include <mex.h>    // Matlab library includes
 #include <matrix.h> // Matlab mxComplexSingle struct
-#endif
 
 #include "../../cpuBackProjection/cpuBackProjection_mex.hpp"
 
