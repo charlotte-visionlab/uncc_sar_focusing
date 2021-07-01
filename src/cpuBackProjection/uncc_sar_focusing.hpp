@@ -22,7 +22,6 @@
 #include <memory>
 #include <numeric>
 #include <string>
-//#include <unordered_map>
 #include <valarray>
 #include <vector>
 
@@ -86,6 +85,17 @@ inline std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp
     return output;
 }
 
+// For back projection algorithm 
+template <typename __Tp>
+class RangeBinData {
+public:
+    typedef std::shared_ptr<RangeBinData> Ptr;
+    // rangeBins for backprojection / compressed range processing
+    SimpleMatrix<__Tp> rangeBins;
+    __Tp minRange;
+    __Tp maxRange;
+};
+
 template<typename _numTp>
 class SAR_Aperture {
 public:
@@ -125,7 +135,7 @@ public:
     // -1 = there is only one polarity in the SAR data file
     int polarity_dimension;
 
-    // Fields set automatically
+    // Fields below set automatically
     int numRangeSamples;
     int numAzimuthSamples;
     int numPolarities;
@@ -371,6 +381,7 @@ public:
     int pol; // What polarization to image (HH,HV,VH,VV)
     // Define image parameters here
     int N_fft; // Number of samples in FFT
+    bool zeropad_fft;
     int N_x_pix; // Number of samples in x direction
     int N_y_pix; // Number of samples in y direction
     _numTp x0_m; // Center of image scene in x direction (m) relative to target swath phase center
@@ -385,7 +396,7 @@ public:
     _numTp azimuthResolution; // Resolution in the cross-range/x direction (m)
 
     CUDAFUNCTION SAR_ImageFormationParameters() : N_fft(512), N_x_pix(512), N_y_pix(512), 
-            x0_m(0), y0_m(0), dyn_range_dB(70) {
+            x0_m(0), y0_m(0), dyn_range_dB(70), zeropad_fft(true) {
     };
 
     template <typename __argTp>
@@ -455,26 +466,6 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_ImageFormationPa
     output << "deltaY_m (cross-range/x-axis resolution) = {" << c.azimuthResolution << "}" << std::endl;
     return output;
 }
-
-/***
- * Function Prototypes
- * ***/
-template<typename __nTp>
-void run_bp(const CArray<__nTp>& phd, float* xObs, float* yObs, float* zObs, float* r,
-        int Npulses, int Nrangebins, int Nx_pix, int Ny_pix, int Nfft,
-        CArray<__nTp>& output_image, float* minF, float* deltaF,
-        float x0, float y0, float Wx, float Wy,
-        float min_eff_idx, float total_proj_length);
-
-template<typename __nTp>
-void computeDifferentialRangeAndPhaseCorrections(const float* xObs, const float* yObs, const float* zObs,
-        const float* range_to_phasectr, const int pulseIndex, const float* minF,
-        const int Npulses, const int Nrangebins, const int Nx_pix, const int Ny_pix, const int Nfft,
-        const float x0, const float y0, const float Wx, const float Wy,
-        const float* r_vec, const CArray<__nTp>& rangeCompressed,
-        const float min_Rvec, const float max_Rvec, const float maxWr,
-        CArray<__nTp>& output_image);
-
 
 template<typename __nTp>
 void fft(CArray<__nTp>& x);

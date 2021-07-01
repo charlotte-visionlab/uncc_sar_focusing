@@ -40,6 +40,7 @@ __global__ void backprojection_loop(float2* sampleData,
         __Tp* slant_range,
         __Tp* startF, 
         SAR_ImageFormationParameters<__Tp>* sar_image_params,
+        __Tp* range_vec,
         float2* output_image) {
 
     float2 subimage;

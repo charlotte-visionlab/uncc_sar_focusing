@@ -260,7 +260,9 @@ void cufft_engine(cufftComplex *dev_signal, int N_fft, int N_batch, int DIR) {
     //    NULL, ostride, odist, CUFFT_C2C, N_batch);
     // Transform signal and kernel
     printf("Transforming signal cufftExecC2C\n");
-    cufftExecC2C(plan, (cufftComplex *) dev_signal, (cufftComplex *) dev_signal, DIR);
+    if (cufftExecC2C(plan, (cufftComplex *) dev_signal, (cufftComplex *) dev_signal, DIR) != CUFFT_SUCCESS) {
+        std::cout << "CUFFT error: ExecC2C Forward failed" << std::endl;
+    }
 }
 
 void cufft(cufftComplex *dev_signal, int N_fft, int N_batch) {
@@ -396,7 +398,10 @@ int finalize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     return EXIT_SUCCESS;
 }
 
-//#include "cufftShift_1D_IP.cuh"
+// idx should be integer    
+#define RANGE_INDEX_TO_RANGE_VALUE(idx, maxWr, N) ((float) idx / N - 0.5f) * maxWr
+// val should be float
+//#define RANGE_VALUE_TO_RANGE_INDEX(val, maxWr, N) (val / maxWr + 0.5f) * N
 
 template <typename __nTp, typename __nTpParams>
 void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
@@ -418,6 +423,34 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         std::cout << "cuda_focus_SAR_image::Problem found initializing resources on the GPU. Exiting..." << std::endl;
         return;
     }
+
+    // Calculate range bins for range compression-based algorithms, e.g., backprojection
+    RangeBinData<__nTp> range_bin_data;
+    range_bin_data.rangeBins.shape.push_back(sar_image_params.N_fft);
+    range_bin_data.rangeBins.shape.push_back(1);
+    range_bin_data.rangeBins.data.resize(sar_image_params.N_fft);
+    __nTp* rangeBins = &range_bin_data.rangeBins.data[0]; //[sar_image_params.N_fft];
+    __nTp& minRange = range_bin_data.minRange;
+    __nTp& maxRange = range_bin_data.maxRange;
+
+    minRange = std::numeric_limits<float>::infinity();
+    maxRange = -std::numeric_limits<float>::infinity();
+    for (int rIdx = 0; rIdx < sar_image_params.N_fft; rIdx++) {
+        // -maxWr/2:maxWr/Nfft:maxWr/2
+        //float rVal = ((float) rIdx / Nfft - 0.5f) * maxWr;
+        __nTp rVal = RANGE_INDEX_TO_RANGE_VALUE(rIdx, sar_image_params.max_Wy_m, sar_image_params.N_fft);
+        rangeBins[rIdx] = rVal;
+        if (minRange > rangeBins[rIdx]) {
+            minRange = rangeBins[rIdx];
+        }
+        if (maxRange < rangeBins[rIdx]) {
+            maxRange = rangeBins[rIdx];
+        }
+    }
+    cuda_res.copyToDevice("range_vec", (void *) &range_bin_data.rangeBins.data[0],
+            range_bin_data.rangeBins.data.size() * sizeof (range_bin_data.rangeBins.data[0]));
+
+
     std::cout << cuda_res << std::endl;
     int numSamples = sar_data.sampleData.data.size();
     //    Complex<__nTp> devResult1[numSamples];
@@ -475,6 +508,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             cuda_res.getDeviceMemPointer<__nTp>("slant_range"),
             cuda_res.getDeviceMemPointer<__nTp>("startF"),
             cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params"),
+            cuda_res.getDeviceMemPointer<__nTp>("range_vec"),            
             cuda_res.getDeviceMemPointer<float2>("output_image"));
 #endif
     c1 = clock();
@@ -495,6 +529,8 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             sar_image_params.N_x_pix * sar_image_params.N_y_pix);
     free(host_data);
 #endif
+
+    cuda_res.freeGPUMemory("range_vec");
 
     if (finalize_CUDAResources(sar_data, sar_image_params, cuda_res) == EXIT_FAILURE) {
         std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..." << std::endl;

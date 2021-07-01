@@ -2,7 +2,7 @@
 #define CUDAFUNCTION __host__ __device__
 
 // Standard Library includes
-#include <stdio.h>  /* printf */
+//#include <stdio.h>  /* printf */
 #include <time.h>
 
 // MATLAB includes

@@ -37,8 +37,8 @@ template <typename __nTp, typename __nTpParams>
 void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
         const SAR_Aperture<__nTp>& SARData,
         const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
-        const CArray<__nTp>& rangeCompressed,
-        const __nTp* r_vec, const __nTp min_Rvec, const __nTp max_Rvec,
+        const CArray<__nTp>& rangeCompressed, 
+        const RangeBinData<__nTp> range_bin_data,
         CArray<__nTp>& output_image) {
 
     float target_x, target_y, target_z;
@@ -47,6 +47,10 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
     float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
     target_x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
+    
+    const __nTp* r_vec = &range_bin_data.rangeBins.data[0];
+    const __nTp& min_Rvec = range_bin_data.minRange;
+    const __nTp& max_Rvec = range_bin_data.maxRange;
     for (int xIdx = 0; xIdx < SARImgParams.N_x_pix; xIdx++) {
         target_y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
         for (int yIdx = 0; yIdx < SARImgParams.N_y_pix; yIdx++) {
@@ -73,8 +77,8 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
 }
 
 template <typename __nTp, typename __nTpParams>
-void run_bp(const SAR_Aperture<__nTp>& SARData,
-        const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
+void run_bp(const SAR_Aperture<__nTp>& sar_data,
+        const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
         CArray<__nTp>& output_image) {
 
     std::cout << "Running backprojection SAR focusing algorithm." << std::endl;
@@ -83,77 +87,89 @@ void run_bp(const SAR_Aperture<__nTp>& SARData,
         data.r_vec = linspace(-data.Nfft/2,data.Nfft/2-1,data.Nfft)*data.maxWr/data.Nfft;
      */
 
-    // TODO: Add range vector to SARData structure
-    __nTp r_vec[SARImgParams.N_fft];
-    __nTp min_Rvec = std::numeric_limits<float>::infinity();
-    __nTp max_Rvec = -std::numeric_limits<float>::infinity();
-    for (int rIdx = 0; rIdx < SARImgParams.N_fft; rIdx++) {
+    if (sar_image_params.zeropad_fft == true) {
+        // zero-pad data to have length N = 2^ceil(log2(SIZE))) where 
+        // SIZE denotes the number of range samples per pulse
+    }
+
+
+    // Calculate range bins for range compression-based algorithms, e.g., backprojection
+    RangeBinData<__nTp> range_bin_data;
+    range_bin_data.rangeBins.shape.push_back(sar_image_params.N_fft);
+    range_bin_data.rangeBins.shape.push_back(1);
+    range_bin_data.rangeBins.data.resize(sar_image_params.N_fft);
+    __nTp* rangeBins = &range_bin_data.rangeBins.data[0]; //[sar_image_params.N_fft];
+    __nTp& minRange = range_bin_data.minRange;
+    __nTp& maxRange = range_bin_data.maxRange;
+
+    minRange = std::numeric_limits<float>::infinity();
+    maxRange = -std::numeric_limits<float>::infinity();
+    for (int rIdx = 0; rIdx < sar_image_params.N_fft; rIdx++) {
         // -maxWr/2:maxWr/Nfft:maxWr/2
         //float rVal = ((float) rIdx / Nfft - 0.5f) * maxWr;
-        __nTp rVal = RANGE_INDEX_TO_RANGE_VALUE(rIdx, SARImgParams.max_Wy_m, SARImgParams.N_fft);
-        r_vec[rIdx] = rVal;
-        if (min_Rvec > r_vec[rIdx]) {
-            min_Rvec = r_vec[rIdx];
+        __nTp rVal = RANGE_INDEX_TO_RANGE_VALUE(rIdx, sar_image_params.max_Wy_m, sar_image_params.N_fft);
+        rangeBins[rIdx] = rVal;
+        if (minRange > rangeBins[rIdx]) {
+            minRange = rangeBins[rIdx];
         }
-        if (max_Rvec < r_vec[rIdx]) {
-            max_Rvec = r_vec[rIdx];
+        if (maxRange < rangeBins[rIdx]) {
+            maxRange = rangeBins[rIdx];
         }
     }
 
     __nTp timeleft = 0.0f;
 
-    const Complex<__nTp>* range_profiles_cast = static_cast<const Complex<__nTp>*> (&SARData.sampleData.data[0]);
+    const Complex<__nTp>* range_profiles_cast = static_cast<const Complex<__nTp>*> (&sar_data.sampleData.data[0]);
     //mxComplexSingleClass* output_image_cast = static_cast<mxComplexSingleClass*> (output_image);
 
-    CArray<__nTp> range_profiles_arr(range_profiles_cast, SARData.numAzimuthSamples * SARData.numRangeSamples);
+    CArray<__nTp> range_profiles_arr(range_profiles_cast, sar_data.numAzimuthSamples * sar_data.numRangeSamples);
 
-    for (int pulseIndex = 0; pulseIndex < SARData.numAzimuthSamples; pulseIndex++) {
+    for (int pulseIndex = 0; pulseIndex < sar_data.numAzimuthSamples; pulseIndex++) {
         if (pulseIndex > 1 && (pulseIndex % 100) == 0) {
-            std::cout << "Pulse " << pulseIndex << " of " << SARData.numAzimuthSamples
+            std::cout << "Pulse " << pulseIndex << " of " << sar_data.numAzimuthSamples
                     << ", " << std::setprecision(2) << timeleft << " minutes remaining" << std::endl;
         }
 
-        CArray<__nTp> phaseData = range_profiles_arr[std::slice(pulseIndex * SARImgParams.N_fft, SARImgParams.N_fft, 1)];
+        CArray<__nTp> phaseData = range_profiles_arr[std::slice(pulseIndex * sar_image_params.N_fft, sar_image_params.N_fft, 1)];
 
         //ifft(phaseData);
         ifftw(phaseData);
 
-        CArray<__nTp> rangeCompressed = fftshift(phaseData);
-        computeDifferentialRangeAndPhaseCorrections(pulseIndex, SARData,
-                SARImgParams, rangeCompressed,
-                r_vec, min_Rvec, max_Rvec,
+        CArray<__nTp> compressed_range = fftshift(phaseData);
+        computeDifferentialRangeAndPhaseCorrections(pulseIndex, sar_data,
+                sar_image_params, compressed_range, range_bin_data,
                 output_image);
     }
 }
 
 template <typename __nTp, typename __nTpParams>
 void computeDifferentialRangeAndPhaseCorrectionsMF(int pulseIndex,
-        const SAR_Aperture<__nTp>& SARData,
-        const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
+        const SAR_Aperture<__nTp>& sar_data,
+        const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
         CArray<__nTp>& output_image) {
 
     float target_x, target_y, target_z;
     target_z = 0;
-    float delta_x = SARImgParams.Wx_m / (SARImgParams.N_x_pix - 1);
-    float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
+    float delta_x = sar_image_params.Wx_m / (sar_image_params.N_x_pix - 1);
+    float delta_y = sar_image_params.Wy_m / (sar_image_params.N_y_pix - 1);
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
-    target_x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
-    for (int xIdx = 0; xIdx < SARImgParams.N_x_pix; xIdx++) {
-        target_y = SARImgParams.y0_m - (SARImgParams.Wy_m / 2);
-        for (int yIdx = 0; yIdx < SARImgParams.N_y_pix; yIdx++) {
-            float dR_val = std::sqrt((SARData.Ant_x.data[pulseIndex] - target_x) * (SARData.Ant_x.data[pulseIndex] - target_x) +
-                    (SARData.Ant_y.data[pulseIndex] - target_y) * (SARData.Ant_y.data[pulseIndex] - target_y) +
-                    (SARData.Ant_z.data[pulseIndex] - target_z) * (SARData.Ant_z.data[pulseIndex] - target_z)) - SARData.slant_range.data[pulseIndex];
+    target_x = sar_image_params.x0_m - (sar_image_params.Wx_m / 2);
+    for (int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+        target_y = sar_image_params.y0_m - (sar_image_params.Wy_m / 2);
+        for (int yIdx = 0; yIdx < sar_image_params.N_y_pix; yIdx++) {
+            float dR_val = std::sqrt((sar_data.Ant_x.data[pulseIndex] - target_x) * (sar_data.Ant_x.data[pulseIndex] - target_x) +
+                    (sar_data.Ant_y.data[pulseIndex] - target_y) * (sar_data.Ant_y.data[pulseIndex] - target_y) +
+                    (sar_data.Ant_z.data[pulseIndex] - target_z) * (sar_data.Ant_z.data[pulseIndex] - target_z)) - sar_data.slant_range.data[pulseIndex];
             //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
             //int outputIdx = xIdx * SARImgParams.N_y_pix + yIdx;
             //std::cout << "output[" << outputIdx << "] += " << (iRC_val * phCorr_val) << std::endl;
-            int pulse_startF_FreqIdx = pulseIndex * SARData.numRangeSamples;
-            for (int freqIdx = 0; freqIdx < SARData.numRangeSamples; freqIdx++) {
+            int pulse_startF_FreqIdx = pulseIndex * sar_data.numRangeSamples;
+            for (int freqIdx = 0; freqIdx < sar_data.numRangeSamples; freqIdx++) {
                 // TODO: Amiguate as default double and have it cast to float if appropriate for precision specifications
-                const Complex<__nTp>& phaseHistorySample = SARData.sampleData.data[pulse_startF_FreqIdx + freqIdx];
+                const Complex<__nTp>& phaseHistorySample = sar_data.sampleData.data[pulse_startF_FreqIdx + freqIdx];
                 //Complex<__nTp> phCorr_val = std::polar(1.0f, (__nTp) ((4.0 * PI * SARData.freq.data[pulse_startF_FreqIdx + freqIdx] * dR_val) / CLIGHT));
-                Complex<__nTp> phCorr_val = Complex<__nTp>::polar(1.0f, (__nTp) ((4.0 * PI * SARData.freq.data[pulse_startF_FreqIdx + freqIdx] * dR_val) / CLIGHT));
-                output_image[xIdx * SARImgParams.N_y_pix + yIdx] += phaseHistorySample * phCorr_val;
+                Complex<__nTp> phCorr_val = Complex<__nTp>::polar(1.0f, (__nTp) ((4.0 * PI * sar_data.freq.data[pulse_startF_FreqIdx + freqIdx] * dR_val) / CLIGHT));
+                output_image[xIdx * sar_image_params.N_y_pix + yIdx] += phaseHistorySample * phCorr_val;
             }
             target_y += delta_y;
         }
