@@ -327,8 +327,8 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     //MY_CUDA_SAFE_CALL(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, deviceId));
     //MY_CUDA_SAFE_CALL(cudaDeviceGetAttribute(&minor, cudaDevAttrComputeCapabilityMinor, deviceId));
     std::cout << "Device " << cuda_res.deviceId << ": \"" << cuda_res.props.name
-            << " has NVIDIA \"" << _ConvertSMVer2ArchName(cuda_res.props.major, cuda_res.props.minor) << "architecture"
-            << "\" with compute capability " << cuda_res.props.major << "." << cuda_res.props.minor << "." << std::endl;
+            << " has NVIDIA \"" << _ConvertSMVer2ArchName(cuda_res.props.major, cuda_res.props.minor) << "\" architecture"
+            << " having compute capability " << cuda_res.props.major << "." << cuda_res.props.minor << "." << std::endl;
     std::cout << "CUDA parameters not provided. Auto-selecting:" << std::endl
             << "\tdevice                " << cuda_res.deviceId << std::endl
             << "\tblockwidth            " << cuda_res.blockwidth << std::endl
@@ -356,7 +356,7 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     cuda_res.copyToDevice("sar_image_params", (void *) &sar_img_params,
             sizeof (sar_img_params));
 
-    int num_img_bytes = 2 * sizeof (float) * sar_img_params.N_x_pix * sar_img_params.N_y_pix;
+    int num_img_bytes = sizeof (cufftComplex) * sar_img_params.N_x_pix * sar_img_params.N_y_pix;
 #if ZEROCOPY
     MY_CUDA_SAFE_CALL(cudaHostAlloc((void**) &cuda_res.out_image, num_img_bytes,
             cudaHostAllocMapped));
@@ -449,6 +449,11 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     }
     cuda_res.copyToDevice("range_vec", (void *) &range_bin_data.rangeBins.data[0],
             range_bin_data.rangeBins.data.size() * sizeof (range_bin_data.rangeBins.data[0]));
+    //        __nTp devResult1[range_bin_data.rangeBins.data.size()];
+    //        cuda_res.copyFromDevice("range_vec", &devResult1[0], range_bin_data.rangeBins.data.size() * sizeof (__nTp));
+    //        for (int i = 0; i < range_bin_data.rangeBins.data.size(); i++) {
+    //            std::cout << "range_vec[" << i << "]=" << std::setprecision(7) << devResult1[i] << std::endl;
+    //        }
 
 
     std::cout << cuda_res << std::endl;
@@ -466,7 +471,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     //    for (int i = 0; i < 10; i++) {
     //        std::cout << "ifft(sampleData)[" << i << "]=" << std::setprecision(7) << devResult[i]/sar_image_params.N_fft << std::endl;
     //    }
-    cufftShift_1D<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft);
+    cufftShift_1DBatch<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
     //    Complex<__nTp> devResult1[numSamples];
     //    cuda_res.copyFromDevice("sampleData", &devResult1[0], numSamples * sizeof (Complex<__nTp>));
     //    for (int i = 0; i < 10; i++) {
@@ -484,32 +489,32 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     // Set up and run the kernel
     dim3 dimBlock(cuda_res.blockwidth, cuda_res.blockheight, 1);
-    dim3 dimGrid(sar_image_params.N_x_pix / cuda_res.blockwidth,
-            sar_image_params.N_y_pix / cuda_res.blockheight);
+    dim3 dimGrid(std::ceil((float) sar_image_params.N_x_pix / cuda_res.blockwidth),
+            std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
 
     clock_t c0, c1;
     c0 = clock();
 
 #if ZEROCOPY
-    backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<float2>("sampleData"),
+    backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
             sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
             delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
             c__4_delta_freq, cuda_res.getDeviceMemPointer<float>("startF"),
             left, bottom, cuda_res.getDeviceMemPointer<float4>("platform_positions"), 0, 0,
-            cuda_res.getDeviceMemPointer<float2>("output_image"));
+            cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
 #else
-    backprojection_loop<__nTp> << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<float2>("sampleData"),
+    backprojection_loop<__nTp> << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
             sar_data.numRangeSamples, sar_data.numAzimuthSamples,
             delta_x_m_per_pix, delta_y_m_per_pix,
-            left_m, bottom_m, 0, 0,
+            left_m, bottom_m, minRange, maxRange,
             cuda_res.getDeviceMemPointer<__nTp>("Ant_x"),
             cuda_res.getDeviceMemPointer<__nTp>("Ant_y"),
             cuda_res.getDeviceMemPointer<__nTp>("Ant_z"),
             cuda_res.getDeviceMemPointer<__nTp>("slant_range"),
             cuda_res.getDeviceMemPointer<__nTp>("startF"),
             cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params"),
-            cuda_res.getDeviceMemPointer<__nTp>("range_vec"),            
-            cuda_res.getDeviceMemPointer<float2>("output_image"));
+            cuda_res.getDeviceMemPointer<__nTp>("range_vec"),
+            cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
 #endif
     c1 = clock();
     printf("INFO: CUDA-mex kernel took %f s\n", (float) (c1 - c0) / CLOCKS_PER_SEC);
@@ -519,15 +524,23 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 #if ZEROCOPY
     from_gpu_complex_to_bp_complex_split(cuda_res.out_image, output_image, sar_image_params.N_x_pix * sar_image_params.N_y_pix);
 #else
-    int num_img_bytes = 2 * sizeof (float) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
-    float2* host_data = (float2*) malloc(num_img_bytes);
-    //double start_t = -ms_walltime();
-    //MY_CUDA_SAFE_CALL(cudaMemcpy(host_data, cuda_res.out_image, cuda_res.num_out_bytes, cudaMemcpyDeviceToHost));
-    //printf("MEMCPY,%lf\n", (start_t + ms_walltime()));
-    from_gpu_complex_to_bp_complex_split(host_data,
-            output_image,
-            sar_image_params.N_x_pix * sar_image_params.N_y_pix);
-    free(host_data);
+    int num_img_bytes = sizeof (cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
+    cufftComplex image_data[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
+    //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
+    cuda_res.copyFromDevice("output_image", &image_data, num_img_bytes);
+    for (int idx = 0; idx < sar_image_params.N_x_pix*sar_image_params.N_y_pix; idx++) {
+        output_image[idx]._M_real = image_data[idx].x;
+        output_image[idx]._M_imag = image_data[idx].y;
+    }
+    //for (int y = 0; y < sar_image_params.N_y_pix; y++) {
+    //    for (int x = 0; x < sar_image_params.N_x_pix; x++) {
+    //        output_image[x * sar_image_params.N_y_pix + y].real() = image_data[x * sar_image_params.N_y_pix + y].x;
+    //        output_image[x * sar_image_params.N_y_pix + y].imag() = image_data[x * sar_image_params.N_y_pix + y].y;
+    //    }
+    //}
+    //    for (int i = 0; i < 10; i++) {
+    //        std::cout << "fftshift(ifft(sampleData))[" << i << "]=" << std::setprecision(7) << devResult1[i]/sar_image_params.N_fft << std::endl;
+    //    }
 #endif
 
     cuda_res.freeGPUMemory("range_vec");
