@@ -59,7 +59,7 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
                     (SARData.Ant_z.data[pulseIndex] - target_z) * (SARData.Ant_z.data[pulseIndex] - target_z)) - SARData.slant_range.data[pulseIndex];
             //  std::cout << "y= " << target.y << " dR(" << xIdx << ", " << yIdx << ") = " << dR_val << std::endl;
             if (dR_val > min_Rvec && dR_val < max_Rvec) {
-                // TODO: Amiguate as default double and have it cast to float if appropriate for precision specifications
+                // TODO: Ambiguate as default double and have it cast to float if appropriate for precision specifications
                 Complex<__nTp> phCorr_val = Complex<__nTp>::polar(1.0f, (__nTp) ((4.0 * PI * SARData.startF.data[pulseIndex] * dR_val) / CLIGHT));
                 //Complex<__nTp> phCorr_val = std::polar(__nTp(1.0), (__nTp) ((4.0 * PI * SARData.startF.data[pulseIndex] * dR_val) / CLIGHT));
                 //std::cout << "idx = " << (xIdx * Ny_pix + yIdx) << " (x,y)=(" << target.x << "," << target.y << ")"

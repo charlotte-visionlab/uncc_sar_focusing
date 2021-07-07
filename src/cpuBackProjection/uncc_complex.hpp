@@ -24,33 +24,33 @@ public:
     __Tp _M_real;
     __Tp _M_imag;
 
-    constexpr __Tp real() const {
+    constexpr CUDAFUNCTION __Tp real() const {
         return _M_real;
     }
 
-    constexpr __Tp imag() const {
+    constexpr CUDAFUNCTION __Tp imag() const {
         return _M_imag;
     }
 
-    unccComplex(const __Tp& _real = __Tp(), const __Tp& _imag = __Tp()) :
+    CUDAFUNCTION unccComplex(const __Tp& _real = __Tp(), const __Tp& _imag = __Tp()) :
     _M_real(_real), _M_imag(_imag) {
         //std::cout << "here2 " << _real << std::endl;
     }
 
     template<typename __oTp>
-    unccComplex(const unccComplex<__oTp> c) : _M_real(c.real()), _M_imag(c.imag()) {
+    CUDAFUNCTION unccComplex(const unccComplex<__oTp> c) : _M_real(c.real()), _M_imag(c.imag()) {
 
     }
     // needed for valarray operations like x /= x.size() 
     // when x is a std::valarray<mxComplexSingleClass>    
 
     template <typename __oTp>
-    inline unccComplex(const __oTp& _real) {
+    inline CUDAFUNCTION unccComplex(const __oTp& _real) {
         _M_real = __Tp(_real);
         _M_imag = 0;
     }
 
-    inline static unccComplex<__Tp> conj(const unccComplex<__Tp>& x) {
+    inline static CUDAFUNCTION unccComplex<__Tp> conj(const unccComplex<__Tp>& x) {
         unccComplex<__Tp> z;
         z._M_real = x.real();
         z._M_imag = -x.imag();
@@ -58,7 +58,7 @@ public:
     }
 
     template <typename __oTp>
-    inline static unccComplex<__Tp> polar(unccComplex<__oTp>& x) {
+    inline static CUDAFUNCTION unccComplex<__Tp> polar(unccComplex<__oTp>& x) {
         unccComplex<__Tp> z;
         z._M_real = norm(x);
         z._M_imag = std::atan2(x.imag(), x.real());
@@ -68,7 +68,7 @@ public:
     // TODO: functions log(), cos(), sin(), tan(), sqrt() not implemented
 
     template <typename __oTp1, typename __oTp2>
-    inline static unccComplex<__Tp> polar(const __oTp1& r, const __oTp2& phi) {
+    inline static CUDAFUNCTION unccComplex<__Tp> polar(const __oTp1& r, const __oTp2& phi) {
         return unccComplex<__Tp>(r * std::cos(phi), r * std::sin(phi));
     }
 
@@ -98,21 +98,21 @@ public:
     }
 
     template <typename __oTp>
-    inline unccComplex<__Tp> operator*(const unccComplex<__oTp>& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp> operator*(const unccComplex<__oTp>& rhs) {
         unccComplex<__Tp> z = *this;
         z *= rhs;
         return z;
     }
 
     template <typename __oTp>
-    inline unccComplex<__Tp> operator*(const __oTp& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp> operator*(const __oTp& rhs) {
         unccComplex<__Tp> z = *this;
         z *= rhs;
         return z;
     }
 
     template <typename __oTp>
-    inline unccComplex<__Tp> operator+(const unccComplex<__oTp>& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp> operator+(const unccComplex<__oTp>& rhs) {
         unccComplex<__Tp> z = *this;
         z += rhs;
         return z;
@@ -139,14 +139,14 @@ public:
         return *this;
     }
 
-    inline unccComplex<__Tp>& operator+=(const unccComplex& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp>& operator+=(const unccComplex& rhs) {
         _M_real += rhs.real();
         _M_imag += rhs.imag();
         return *this;
     }
 
     template <typename __oTp>
-    inline unccComplex<__Tp>& operator+=(const __oTp& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp>& operator+=(const __oTp& rhs) {
         _M_real += rhs;
         return *this;
     }
@@ -166,13 +166,13 @@ public:
     }
 
     template <typename __oTp>
-    inline unccComplex<__Tp>& operator*=(const __oTp& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp>& operator*=(const __oTp& rhs) {
         _M_imag *= rhs;
         _M_real *= rhs;
         return *this;
     }
 
-    inline unccComplex<__Tp>& operator*=(const unccComplex<__Tp>& rhs) {
+    inline CUDAFUNCTION unccComplex<__Tp>& operator*=(const unccComplex<__Tp>& rhs) {
         const float __r = _M_real * rhs._M_real - _M_imag * rhs._M_imag;
         _M_imag = _M_real * rhs.imag() + _M_imag * rhs.real();
         _M_real = __r;
@@ -255,14 +255,14 @@ inline unccComplex<__Tp> operator*(const unccComplex<__Tp>& __x, const unccCompl
 }
 
 template<typename __Tp>
-inline unccComplex<__Tp> operator*(const unccComplex<__Tp> & __x, const __Tp& __y) {
+inline CUDAFUNCTION unccComplex<__Tp> operator*(const unccComplex<__Tp> & __x, const __Tp& __y) {
     unccComplex<__Tp> __r = __x;
     __r *= __y;
     return __r;
 }
 
 template<typename __Tp>
-inline unccComplex<__Tp> operator*(const __Tp& __x, const unccComplex<__Tp>& __y) {
+inline CUDAFUNCTION unccComplex<__Tp> operator*(const __Tp& __x, const unccComplex<__Tp>& __y) {
     unccComplex<__Tp> __r = __y;
     __r *= __x;
     return __r;
