@@ -86,6 +86,7 @@ inline std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp
 }
 
 // For back projection algorithm 
+
 template <typename __Tp>
 class RangeBinData {
 public:
@@ -378,6 +379,12 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
 template<typename _numTp>
 class SAR_ImageFormationParameters {
 public:
+
+    enum ALGORITHM {
+        UNKNOWN,
+        MATCHED_FILTER,
+        BACKPROJECTION
+    } algorithm;
     int pol; // What polarization to image (HH,HV,VH,VV)
     // Define image parameters here
     int N_fft; // Number of samples in FFT
@@ -395,8 +402,8 @@ public:
     _numTp ground_rangeResolution; // Ground range resolution in the down-range/x direction (m)
     _numTp azimuthResolution; // Resolution in the cross-range/x direction (m)
 
-    CUDAFUNCTION SAR_ImageFormationParameters() : N_fft(512), N_x_pix(512), N_y_pix(512), 
-            x0_m(0), y0_m(0), dyn_range_dB(70), zeropad_fft(true) {
+    CUDAFUNCTION SAR_ImageFormationParameters() : N_fft(512), N_x_pix(512), N_y_pix(512),
+    x0_m(0), y0_m(0), dyn_range_dB(70), zeropad_fft(true), algorithm(ALGORITHM::BACKPROJECTION) {
     };
 
     template <typename __argTp>

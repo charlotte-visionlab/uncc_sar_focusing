@@ -37,7 +37,7 @@ template <typename __nTp, typename __nTpParams>
 void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
         const SAR_Aperture<__nTp>& SARData,
         const SAR_ImageFormationParameters<__nTpParams>& SARImgParams,
-        const CArray<__nTp>& rangeCompressed, 
+        const CArray<__nTp>& rangeCompressed,
         const RangeBinData<__nTp> range_bin_data,
         CArray<__nTp>& output_image) {
 
@@ -47,7 +47,7 @@ void computeDifferentialRangeAndPhaseCorrections(int pulseIndex,
     float delta_y = SARImgParams.Wy_m / (SARImgParams.N_y_pix - 1);
     //std::cout << "(minRvec,maxRvec) = (" << min_Rvec << ", " << max_Rvec << ")" << std::endl;
     target_x = SARImgParams.x0_m - (SARImgParams.Wx_m / 2);
-    
+
     const __nTp* r_vec = &range_bin_data.rangeBins.data[0];
     const __nTp& min_Rvec = range_bin_data.minRange;
     const __nTp& max_Rvec = range_bin_data.maxRange;
@@ -211,9 +211,24 @@ void focus_SAR_image(const SAR_Aperture<__nTp>& SARData,
             << SARImgParams.max_Wx_m << " m cross-range" << std::endl;
     std::cout << "Resolution:  " << std::fixed << std::setprecision(2) << SARImgParams.slant_rangeResolution << "m range, "
             << SARImgParams.azimuthResolution << " m cross-range" << std::endl;
-
-    run_bp(SARData, SARImgParams, output_image);
-    //run_mf(SARData, SARImgParams, output_image);
+    switch (SARImgParams.algorithm) {
+        case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
+            std::cout << "Selected backprojection algorithm for focusing." << std::endl;
+            if (SARImgParams.N_fft != SARData.numRangeSamples) {
+                std::cout << "Zero padding SAR samples." << std::endl;
+                // TODO: 
+                // Zero pad the SAR samples in the range direction
+                // Recalculate the aperture frequency samples
+            }
+            run_bp(SARData, SARImgParams, output_image);
+            break;
+        case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::MATCHED_FILTER:
+            std::cout << "Selected matched filtering algorithm for focusing." << std::endl;
+            run_mf(SARData, SARImgParams, output_image);
+            break;
+        default:
+            std::cout << "focus_SAR_image()::Algorithm requested is not recognized or available." << std::endl;
+    }
 }
 
 #endif /* CPUBACKPROJECTION_HPP */

@@ -36,8 +36,8 @@ __global__ void backprojection_loop(const cufftComplex* sampleData,
         const __Tp* range_vec,
         cufftComplex* output_image) {
 
-    int x_pix = (blockIdx.x * blockDim.x + threadIdx.x);
-    int y_pix = (blockIdx.y * blockDim.y + threadIdx.y);
+    int x_pix = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int y_pix = (blockIdx.y * blockDim.y) + threadIdx.y;
     if (x_pix >= sar_image_params->N_x_pix || y_pix >= sar_image_params->N_y_pix) {
         return;
     }
@@ -83,42 +83,29 @@ __global__ void backprojection_loop(const cufftComplex* sampleData,
     output_image[(x_pix * sar_image_params->N_y_pix) + y_pix].y = xy_pix_SLC_return.imag();
 }
 
-/*********************************************************************
- * Copyright © 2011-2014,
- * Marwan Abdellah: <abdellah.marwan@gmail.com>
- *
- * This library (cufftShift) is free software; you can redistribute it
- * and/or modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation.
- *
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this library; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
- * MA 02110-1301, USA.
- ********************************************************************/
+__global__
+void cufftNormalize_1DBatch_kernel(cufftComplex* data, const int N, const int num_batches) {
+    int batch_index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int value_index = (blockIdx.y * blockDim.y) + threadIdx.y;
+    int fvalue_offset = N * batch_index + value_index;
+    if (batch_index < num_batches && value_index < N) {
+        data[fvalue_offset].x /= N;
+        data[fvalue_offset].y /= N;        
+    }
+}
 
-#ifndef CUFFTSHIFT_1DBATCH_ARRAY_CU
-#define CUFFTSHIFT_1DBATCH_ARRAY_CU
-#include <cuda.h>
-
-template <typename T>
-void cufftShift_1DBatch(T* data, int N, int num_batches) {
+void cufftNormalize_1DBatch(cufftComplex *data, const int N, const int num_batches) {
     dim3 block = dim3(16, 16, 1);
     dim3 grid = dim3(std::ceil((float) num_batches / 16),
             std::ceil((float) N / 16));
-    cufftShift_1DBatch_kernel << < grid, block >>> (data, N, num_batches);
+    cufftNormalize_1DBatch_kernel << < grid, block >>> (data, N, num_batches);
 }
 
-template <typename T>
+template <typename T >
 __global__
 void cufftShift_1DBatch_kernel(T* data, int N, int num_batches) {
-    int batch_index = ((blockIdx.x * blockDim.x) + threadIdx.x);
-    int value_index = ((blockIdx.y * blockDim.y) + threadIdx.y);
+    int batch_index = (blockIdx.x * blockDim.x) + threadIdx.x;
+    int value_index = (blockIdx.y * blockDim.y) + threadIdx.y;
     int fvalue_offset = N * batch_index + value_index;
     if (batch_index < num_batches && value_index < N / 2) {
         // Save the first value
@@ -129,7 +116,14 @@ void cufftShift_1DBatch_kernel(T* data, int N, int num_batches) {
         data[fvalue_offset + (N / 2)] = (T) regTemp;
     }
 }
-#endif // CUFFTSHIFT_1DBATCH_ARRAY_CU
+
+template <typename T>
+void cufftShift_1DBatch(T* data, int N, int num_batches) {
+    dim3 block = dim3(16, 16, 1);
+    dim3 grid = dim3(std::ceil((float) num_batches / 16),
+            std::ceil((float) N / 16));
+    cufftShift_1DBatch_kernel << < grid, block >>> (data, N, num_batches);
+}
 
 #endif /* GPUBACKPROJECTIONKERNELS_CUH */
 

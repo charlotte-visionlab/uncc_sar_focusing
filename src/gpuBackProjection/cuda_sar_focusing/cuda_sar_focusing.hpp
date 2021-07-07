@@ -408,6 +408,20 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
         CArray<__nTp>& output_image) {
 
+    switch (sar_image_params.algorithm) {
+        case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
+            std::cout << "Selected backprojection algorithm for focusing." << std::endl;
+            //run_bp(sar_data, sar_image_params, output_image);
+            break;
+        case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::MATCHED_FILTER:
+            std::cout << "Selected matched filtering algorithm for focusing." << std::endl;
+            //run_mf(SARData, SARImgParams, output_image);
+            //break;
+        default:
+            std::cout << "focus_SAR_image()::Algorithm requested is not recognized or available." << std::endl;
+            return;
+    }
+
     // Display maximum scene size and resolution
     std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << sar_image_params.max_Wy_m << " m range, "
             << sar_image_params.max_Wx_m << " m cross-range" << std::endl;
@@ -458,29 +472,15 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     std::cout << cuda_res << std::endl;
     int numSamples = sar_data.sampleData.data.size();
-    //    Complex<__nTp> devResult1[numSamples];
-    //    cuda_res.copyFromDevice("sampleData", &devResult1[0], numSamples * sizeof (Complex<__nTp>));
-    //    for (int i = 0; i < 10; i++) {
-    //        std::cout << "sampleData[" << i << "]=" << std::setprecision(7) << devResult1[i] << std::endl;
-    //    }
 
+    clock_t c0, c1;
+
+    c0 = clock();
     cuifft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
-
-    //    Complex<__nTp> devResult[numSamples];
-    //    cuda_res.copyFromDevice("sampleData", &devResult[0], numSamples * sizeof (Complex<__nTp>));
-    //    for (int i = 0; i < 10; i++) {
-    //        std::cout << "ifft(sampleData)[" << i << "]=" << std::setprecision(7) << devResult[i]/sar_image_params.N_fft << std::endl;
-    //    }
+    cufftNormalize_1DBatch(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
     cufftShift_1DBatch<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
-    //    Complex<__nTp> devResult1[numSamples];
-    //    cuda_res.copyFromDevice("sampleData", &devResult1[0], numSamples * sizeof (Complex<__nTp>));
-    //    for (int i = 0; i < 10; i++) {
-    //        std::cout << "fftshift(ifft(sampleData))[" << i << "]=" << std::setprecision(7) << devResult1[i]/sar_image_params.N_fft << std::endl;
-    //    }
-    //__nTp c__4_delta_freq = CLIGHT / (4.0 * sar_data.deltaF.data[0]);
-    //__nTp pi_4_f0__clight = (PI * 4.0 * sar_data.startF.data[0]) / CLIGHT;
-    //__nTp r_start_pre = (c__4_delta_freq * (float) sar_data.numRangeSamples / ((float) sar_data.numRangeSamples - 1.0f));
-    //convert_f0(start_frequencies, Npulses);
+    c1 = clock();
+    printf("INFO: CUDA FFT kernels took %f ms.\n", (float) (c1 - c0) * 1000 / CLOCKS_PER_SEC);
 
     __nTp delta_x_m_per_pix = sar_image_params.Wx_m / (sar_image_params.N_x_pix - 1);
     __nTp delta_y_m_per_pix = sar_image_params.Wy_m / (sar_image_params.N_y_pix - 1);
@@ -492,9 +492,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     dim3 dimGrid(std::ceil((float) sar_image_params.N_x_pix / cuda_res.blockwidth),
             std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
 
-    clock_t c0, c1;
     c0 = clock();
-
 #if ZEROCOPY
     backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
             sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
@@ -517,7 +515,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
 #endif
     c1 = clock();
-    printf("INFO: CUDA-mex kernel took %f s\n", (float) (c1 - c0) / CLOCKS_PER_SEC);
+    printf("INFO: CUDA Backprojection kernel took %f ms.\n", (float) (c1 - c0) * 1000 / CLOCKS_PER_SEC);
     if (cudaDeviceSynchronize() != cudaSuccess)
         printf("\nERROR: threads did NOT synchronize! DO NOT TRUST RESULTS!\n\n");
 
@@ -528,7 +526,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     cufftComplex image_data[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
     //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
     cuda_res.copyFromDevice("output_image", &image_data, num_img_bytes);
-    for (int idx = 0; idx < sar_image_params.N_x_pix*sar_image_params.N_y_pix; idx++) {
+    for (int idx = 0; idx < sar_image_params.N_x_pix * sar_image_params.N_y_pix; idx++) {
         output_image[idx]._M_real = image_data[idx].x;
         output_image[idx]._M_imag = image_data[idx].y;
     }
