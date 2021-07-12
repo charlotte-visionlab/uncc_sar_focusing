@@ -18,7 +18,7 @@ clear all; close all; clc
 %   Altorithms for Synthetic Aperture Radar Imagery XIV 6568, SPIE     %
 %   (2007).                                                            %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+clear;
 % INPUT PARAMETERS START HERE %
 addpath('../build/lib');
 % Define the path to the base directory of the dataset
@@ -38,8 +38,8 @@ data.Wy = 100;          % Scene extent y (m)
 data.Nfft = 424;        % Number of samples in FFT
 data.Nx = 500;          % Number of samples in x direction
 data.Ny = 500;          % Number of samples in y direction
-data.x0 = 10;            % Center of image scene in x direction (m)
-data.y0 = -10;            % Center of image scene in y direction (m)
+data.x0 = 0;            % Center of image scene in x direction (m)
+data.y0 = 0;            % Center of image scene in y direction (m)
 dyn_range = 70;         % dB of dynamic range to display
 
 % INPUT PARAMETERS END HERE %
@@ -119,8 +119,8 @@ data.x_vec = linspace(data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.Nx);
 data.y_vec = linspace(data.y0 - data.Wy/2, data.y0 + data.Wy/2, data.Ny);
 %data.y_vec(1:10)
 [data.x_mat,data.y_mat] = meshgrid(data.x_vec,data.y_vec);
-data.x_mat = single(data.x_mat);
-data.y_mat = single(data.y_mat);
+% data.x_mat = single(data.x_mat);
+% data.y_mat = single(data.y_mat);
 data.z_mat = zeros(size(data.x_mat),'single');
 
 if (false)
@@ -136,28 +136,29 @@ if (false)
     data.AntZ = single(data.AntZ);
     data.deltaF = single(data.deltaF);
     data = bpBasic(data);
-elseif (true)
+elseif (false)
     data.z_vec = zeros(1,length(data.x_vec));
-    data.phdata = single(data.phdata);
-    data.minF = single(data.minF);
-    data.deltaF = single(data.deltaF);
-    data.R0 = single(data.R0);
-    data.AntX = single(data.AntX);
-    data.AntY = single(data.AntY);
-    data.AntZ = single(data.AntZ);
-    %data.Nfft = single(data.Nfft);
-    data.x_vec = single(data.x_vec);
-    data.y_vec = single(data.y_vec);
-    data.z_vec = single(data.z_vec);
-    data.x0 = single(data.x0);
-    data.y0 = single(data.y0);
-    data.Wx = single(data.Wx);
-    data.Wy = single(data.Wy);
+     data.phdata = single(data.phdata);
+%     data.phdata = double(data.phdata);
+%     data.minF = single(data.minF);
+%     data.deltaF = single(data.deltaF);
+%     data.R0 = single(data.R0);
+%     data.AntX = single(data.AntX);
+%     data.AntY = single(data.AntY);
+%     data.AntZ = single(data.AntZ);
+%     %data.Nfft = single(data.Nfft);
+%     data.x_vec = single(data.x_vec);
+%     data.y_vec = single(data.y_vec);
+%     data.z_vec = single(data.z_vec);
+%     data.x0 = single(data.x0);
+%     data.y0 = single(data.y0);
+%     data.Wx = single(data.Wx);
+%     data.Wy = single(data.Wy);
     %data.phdata(1:10,1:2)
     data = bpBasic(data);
-    
-    data.im_final2 = cpuBackProjection(data.phdata, data.minF, ...
-        data.deltaF, data.R0, data.AntX, data.AntY, data.AntZ, ...
+    %data = mfBasic(data);
+    device = 'CPU';
+    data.im_final2 = cpuBackProjection(data.phdata, data.freq, data.AntX, data.AntY, data.AntZ, data.R0, ...
         data.Nx, data.Ny, data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
     %profile viewer;
 else
@@ -166,6 +167,8 @@ else
     % mexcuda -v -I/usr/local/cuda-11.3/samples/common/inc CUDABackProjectionKernel.cu
     data.z_vec = zeros(1,length(data.x_vec));
     data.phdata = single(data.phdata);
+    data.freq = single(data.freq);
+    %data.phdata = double(data.phdata);
     data.minF = single(data.minF);
     data.R0 = single(data.R0);
     data.x_vec = single(data.x_vec);
@@ -175,12 +178,12 @@ else
     data.AntY = single(data.AntY);
     data.AntZ = single(data.AntZ);
     data.deltaF = single(data.deltaF);
-    for pulseIdx=1:size(data.phdata,2)
-        data.rc(:,pulseIdx) = fftshift(ifft(data.phdata(:,pulseIdx),data.Nfft));
-    end
-    bounds = single([data.x0 - data.Wx/2, data.x0 + data.Wx/2, data.y0 - data.Wy/2, data.y0 + data.Wy/2]);
-    data.im_final = cudaBackProjection(data.phdata, data.minF, data.R0, data.AntX, data.AntY, data.AntZ, data.Nx, data.Ny, data.deltaF(1), ...
-        bounds(1), bounds(2), bounds(3), bounds(4));
+    data = bpBasic(data);
+    device = 'GPU';
+    tic;
+    data.im_final2 = cuda_sar_focusing(data.phdata, data.freq, data.AntX, data.AntY, data.AntZ, data.R0, ...
+        data.Nx, data.Ny, data.Nfft, data.x0, data.y0, data.Wx, data.Wy);
+    toc;
 end
 % Display the image
 figure
@@ -193,8 +196,8 @@ h = xlabel('x (m)');
 h = ylabel('y (m)');
 %set(h,'FontSize',14,'FontWeight','Bold');
 colorbar
-subplot(1,3,2), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
-    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('CPU BP');
+subplot(1,3,2), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final2)./...
+    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title(strcat(device,' BP'));
 %set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
 %    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
 h = xlabel('x (m)');
@@ -202,8 +205,10 @@ h = xlabel('x (m)');
 h = ylabel('y (m)');
 %set(h,'FontSize',14,'FontWeight','Bold');
 colorbar
-subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)./...
-    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab-CPU Difference');
+subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)), ...
+    [-dyn_range 0]), colormap gray, axis xy image, title(strcat('Matlab-',device,' Difference'));
+%subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)./...
+%    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab-CPU Difference');
 %set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
 %    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
 h = xlabel('x (m)');
