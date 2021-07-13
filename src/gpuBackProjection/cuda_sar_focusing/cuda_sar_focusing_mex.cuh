@@ -28,7 +28,7 @@ int cuda_SARFocusingAlgorithm(int nrhs, const mxArray* prhs[], Complex<__nTp> *o
 
     std::cout << sar_aperture_data << std::endl;
 
-    sar_aperture_data.polarity_channel = 1;
+    sar_aperture_data.polarity_channel = 0;
     if (sar_aperture_data.sampleData.shape.size() > 2) {
         sar_aperture_data.format_GOTCHA = false;
     }

@@ -57,6 +57,20 @@ public:
         return shape.size() == 0;
     }
 
+    SimpleMatrix getDataChannel(int channel_index, int channel_number) {
+        SimpleMatrix<__numTp> output;
+        int elem_per_channel = 1;
+        for (int cidx = 0; cidx < channel_index; cidx++) {
+            elem_per_channel *= shape[cidx];
+            output.shape.push_back(shape[cidx]);
+        }
+        int start_offset = elem_per_channel * channel_number;
+//        output.data.insert(data.begin() + start_offset,
+//                data.begin() + start_offset + elem_per_channel,
+//                std::back_inserter(output.data));
+        return output;
+    }
+
     SimpleMatrix::Ptr create() {
         return std::make_shared<SimpleMatrix>();
     }
@@ -171,6 +185,15 @@ public:
 
     template <typename _Tp>
     friend std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_Tp> &c);
+
+    int exportData(SAR_Aperture<_numTp>& dstData, int data_channel) {
+        dstData.numRangeSamples = sampleData.shape[0];
+        dstData.numAzimuthSamples = sampleData.shape[1];
+        dstData.numPolarities = (sampleData.shape.size() > 2) ? sampleData.shape[2] : 1;
+        dstData.sampleData = sampleData.getDataChannel(2, 1);
+        return EXIT_SUCCESS;
+    }
+
 };
 
 template <typename _numTp>
@@ -196,7 +219,6 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
         output << "af.ph_correct" << c.af.ph_correct << std::endl;
     } else {
         output << "ADF" << c.ADF << std::endl;
-        output << "StartF" << c.startF << std::endl;
         output << "ChirpRate" << c.chirpRate << std::endl;
         output << "ChirpRateDelta" << c.chirpRateDelta << std::endl;
     }

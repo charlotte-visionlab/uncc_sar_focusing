@@ -37,20 +37,20 @@ int main(int argc, char **argv) {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        //        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
-        //        std::string fileprefix = Sandia_RioGrande_fileprefix;
-        //        std::string filepostfix = Sandia_RioGrande_filepostfix;
+        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        std::string fileprefix = Sandia_RioGrande_fileprefix;
+        std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
         //        std::string filepostfix = Sandia_Farms_filepostfix;
-        //        ss << std::setfill('0') << std::setw(2) << file_idx;
+        ss << std::setfill('0') << std::setw(2) << file_idx;
 
         initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
-        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-        std::string fileprefix = GOTCHA_fileprefix;
-        std::string filepostfix = GOTCHA_filepostfix;
-        ss << std::setfill('0') << std::setw(3) << azimuth;
+        //int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+        //std::string fileprefix = GOTCHA_fileprefix;
+        //std::string filepostfix = GOTCHA_filepostfix;
+        //ss << std::setfill('0') << std::setw(3) << azimuth;
 
         initialize_GOTCHA_MATRead(matlab_readvar_map);
 
@@ -71,13 +71,13 @@ int main(int argc, char **argv) {
     // 1 = HH, 2 = HV, 3 = VH, 4 = VVbandwidth = 0:freq_per_sample:(numRangeSamples-1)*freq_per_sample;
     std::string polarity = result["polarity"].as<std::string>();
     if ((polarity == "HH" || polarity == "any") && SAR_aperture_data.sampleData.shape.size() >= 1) {
-        SAR_aperture_data.polarity_channel = 1;
+        SAR_aperture_data.polarity_channel = 0;
     } else if (polarity == "HV" && SAR_aperture_data.sampleData.shape.size() >= 2) {
-        SAR_aperture_data.polarity_channel = 2;
+        SAR_aperture_data.polarity_channel = 1;
     } else if (polarity == "VH" && SAR_aperture_data.sampleData.shape.size() >= 3) {
-        SAR_aperture_data.polarity_channel = 3;
+        SAR_aperture_data.polarity_channel = 2;
     } else if (polarity == "VV" && SAR_aperture_data.sampleData.shape.size() >= 4) {
-        SAR_aperture_data.polarity_channel = 4;
+        SAR_aperture_data.polarity_channel = 3;
     } else {
         std::cout << "Requested polarity channel " << polarity << " is not available." << std::endl;
         return EXIT_FAILURE;
@@ -92,6 +92,8 @@ int main(int argc, char **argv) {
     }
     // Print out data after critical data fields for SAR focusing have been computed
     initialize_SAR_Aperture_Data(SAR_aperture_data);
+    SAR_Aperture<NumericType> SAR_focusing_data;
+    SAR_aperture_data.exportData(SAR_focusing_data, SAR_aperture_data.polarity_channel);
 
     std::cout << SAR_aperture_data << std::endl;
 
