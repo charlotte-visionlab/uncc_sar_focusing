@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        int file_idx = 9; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
         std::string fileprefix = Sandia_RioGrande_fileprefix;
         std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
@@ -47,10 +47,10 @@ int main(int argc, char **argv) {
         initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
-        //int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-        //std::string fileprefix = GOTCHA_fileprefix;
-        //std::string filepostfix = GOTCHA_filepostfix;
-        //ss << std::setfill('0') << std::setw(3) << azimuth;
+        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+//        std::string fileprefix = GOTCHA_fileprefix;
+//        std::string filepostfix = GOTCHA_filepostfix;
+//        ss << std::setfill('0') << std::setw(3) << azimuth;
 
         initialize_GOTCHA_MATRead(matlab_readvar_map);
 
@@ -84,27 +84,32 @@ int main(int argc, char **argv) {
     }
     if (SAR_aperture_data.sampleData.shape.size() > 2) {
         SAR_aperture_data.format_GOTCHA = false;
-    }
-    if (!SAR_aperture_data.format_GOTCHA) {
         // the dimensional index of the polarity index in the 
         // multi-dimensional array (for Sandia SPH SAR data)
         SAR_aperture_data.polarity_dimension = 2;
     }
-    // Print out data after critical data fields for SAR focusing have been computed
-    initialize_SAR_Aperture_Data(SAR_aperture_data);
-    SAR_Aperture<NumericType> SAR_focusing_data;
-    SAR_aperture_data.exportData(SAR_focusing_data, SAR_aperture_data.polarity_channel);
 
+    initialize_SAR_Aperture_Data(SAR_aperture_data);
+    // Print out data after critical data fields for SAR focusing have been computed
     std::cout << SAR_aperture_data << std::endl;
 
-    SAR_ImageFormationParameters<NumericType> SAR_image_params =
-            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_aperture_data);
+    SAR_Aperture<NumericType> SAR_focusing_data;
+    if (!SAR_aperture_data.format_GOTCHA) {
+        //SAR_aperture_data.exportData(SAR_focusing_data, SAR_aperture_data.polarity_channel);
+        SAR_aperture_data.exportData(SAR_focusing_data, 2);
+    } else {
+        SAR_focusing_data = SAR_aperture_data;
+    }
 
-    std::cout << SAR_image_params << std::endl;
+    SAR_ImageFormationParameters<NumericType> SAR_image_params =
+            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_focusing_data);
+
+    std::cout << "Data for focusing" << std::endl;
+    std::cout << SAR_focusing_data << std::endl;
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    cuda_focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
+    cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image);
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();

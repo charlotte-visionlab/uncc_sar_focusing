@@ -57,16 +57,16 @@ __global__ void backprojection_loop(const cufftComplex* sampleData,
         if (dR_val > rmin && dR_val < rmax) {
             Complex<float> phCorr_val = Complex<float>::polar(1.0f, (float) ((4.0 * PI * startF[pulseNum] * dR_val) / CLIGHT));
             float dR_idx = (dR_val / sar_image_params->max_Wy_m + 0.5f) * sar_image_params->N_fft;
-            int rightIdx = (int) dR_idx;
+            int rightIdx = (int) roundf(dR_idx);
             //while (++rightIdx < sar_image_params->N_fft && range_vec[rightIdx] <= dR_val);
             float alpha = (dR_val - range_vec[rightIdx - 1]) / (range_vec[rightIdx] - range_vec[rightIdx - 1]);
             Complex<float> lVal(sampleData[pulseNum * sar_image_params->N_fft + rightIdx - 1].x, sampleData[pulseNum * sar_image_params->N_fft + rightIdx - 1].y);
             Complex<float> rVal(sampleData[pulseNum * sar_image_params->N_fft + rightIdx].x, sampleData[pulseNum * sar_image_params->N_fft + rightIdx].y);
             Complex<float> iRC_val = alpha * rVal + (float(1.0) - alpha) * lVal;
             //if (abs(xpos_m) < 0.5 && abs(ypos_m) < 0.5) {
-            //printf("pulse=%d (x,y)=(%f,%f) platform(x,y,z)=(%f,%f,%f) R0=%f R=%f dR_val=%f dR_idx = %f (rmin,rmax) = (%f,%f) rightIdx = %d range_vec[ridx-1] = %f range_vec[ridx] = %f\n", pulseNum, xpos_m, ypos_m,
-            //        Ant_x[pulseNum], Ant_y[pulseNum], Ant_z[pulseNum], slant_range[pulseNum], R, dR_val, dR_idx, rmin, rmax,
-            //        rightIdx, range_vec[rightIdx - 1], range_vec[rightIdx]);
+            //    printf("pulse=%d (x,y)=(%f,%f) platform(x,y,z)=(%f,%f,%f) R0=%f R=%f dR_val=%f dR_idx = %f (rmin,rmax) = (%f,%f) rightIdx = %d range_vec[ridx-1] = %f range_vec[ridx] = %f\n", pulseNum, xpos_m, ypos_m,
+            //            Ant_x[pulseNum], Ant_y[pulseNum], Ant_z[pulseNum], slant_range[pulseNum], R, dR_val, dR_idx, rmin, rmax,
+            //            rightIdx, range_vec[rightIdx - 1], range_vec[rightIdx]);
             //}
             xy_pix_SLC_return += iRC_val * phCorr_val;
         }

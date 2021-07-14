@@ -166,7 +166,7 @@ public:
         if (!gpu_mem.dev_mem) {
             std::cout << "freeGPUMemory::Failure to free. GPU memory with the name \"" + name + "\" has device memory address = nullptr." << std::endl;
         }
-        cudaFree(gpu_mem.dev_mem);
+        MY_CUDA_SAFE_CALL(cudaFree(gpu_mem.dev_mem));
         gpu_mem.dev_mem = nullptr;
         if (gpu_mem.isEmpty()) {
             gpu_mmap.erase(name);
@@ -211,7 +211,7 @@ public:
         return result;
     }
 
-    GPUMemoryManager() : deviceId(-1) {
+    GPUMemoryManager() : deviceId(-1), blockheight(16), blockwidth(16) {
     }
 
     virtual ~GPUMemoryManager() {
@@ -271,32 +271,6 @@ void cufft(cufftComplex *dev_signal, int N_fft, int N_batch) {
 
 void cuifft(cufftComplex *dev_signal, int N_fft, int N_batch) {
     cufft_engine(dev_signal, N_fft, N_batch, CUFFT_INVERSE);
-}
-
-// functions that format data for export to GPU (perhaps not required)
-
-template<typename __nTp>
-void from_gpu_complex_to_bp_complex_split(float2* data, CArray<__nTp>& out, int size) {
-    int i;
-    for (i = 0; i < size; i++) {
-        out[i]._M_real = data[i].x;
-        out[i]._M_imag = data[i].y;
-    }
-}
-
-template<typename __nTp>
-float2* format_complex_to_columns(const Complex<__nTp>* a, int width_orig, int height_orig) {
-    float2* out = (float2*) malloc(width_orig * height_orig * sizeof (float2));
-    int i, j;
-    for (i = 0; i < height_orig; i++) {
-        int origOffset = i * width_orig;
-        for (j = 0; j < width_orig; j++) {
-            int newOffset = j * height_orig;
-            out[newOffset + i].x = a[origOffset + j].real();
-            out[newOffset + i].y = a[origOffset + j].imag();
-        }
-    }
-    return out;
 }
 
 // GPU initialization
@@ -425,7 +399,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     // Display maximum scene size and resolution
     std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << sar_image_params.max_Wy_m << " m range, "
             << sar_image_params.max_Wx_m << " m cross-range" << std::endl;
-    std::cout << "Resolution:  " << std::fixed << std::setprecision(2) << sar_image_params.slant_rangeResolution << "m range, "
+    std::cout << "Maximum Resolution:  " << std::fixed << std::setprecision(2) << sar_image_params.slant_rangeResolution << "m range, "
             << sar_image_params.azimuthResolution << " m cross-range" << std::endl;
     GPUMemoryManager cuda_res;
 
@@ -523,9 +497,9 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     from_gpu_complex_to_bp_complex_split(cuda_res.out_image, output_image, sar_image_params.N_x_pix * sar_image_params.N_y_pix);
 #else
     int num_img_bytes = sizeof (cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
-    cufftComplex image_data[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
+    std::vector<cufftComplex> image_data(sar_image_params.N_x_pix * sar_image_params.N_y_pix);
     //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
-    cuda_res.copyFromDevice("output_image", &image_data, num_img_bytes);
+    cuda_res.copyFromDevice("output_image", image_data.data(), num_img_bytes);
     for (int idx = 0; idx < sar_image_params.N_x_pix * sar_image_params.N_y_pix; idx++) {
         output_image[idx]._M_real = image_data[idx].x;
         output_image[idx]._M_imag = image_data[idx].y;

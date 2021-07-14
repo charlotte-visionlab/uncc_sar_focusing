@@ -1,14 +1,14 @@
 /* 
- * File:   mxComplexSingleClass.hpp
+ * File:   uncc_complex.hpp
  * Author: arwillis
  *
  * Created on June 16, 2021, 12:14 PM
  */
-#ifndef MXCOMPLEXSINGLECLASS_HPP
-#define MXCOMPLEXSINGLECLASS_HPP
+#ifndef UNCC_COMPLEX_HPP
+#define UNCC_COMPLEX_HPP
 
-// TODO: We should be extending mxComplexSingle with an ExpressionTemplate class
-//       then extending the ExpressionTemplate class with the mxComplexSingleClass
+// TODO: We should be extending uncc_complex with an ExpressionTemplate class
+//       then extending the ExpressionTemplate class with the uncc_complex class
 // Reference and explanation of Expression Templates:
 //  https://en.wikipedia.org/wiki/Expression_templates
 // Why implementing them may be valuable for performance:
@@ -359,5 +359,5 @@ inline std::ostream& operator<<(std::ostream& output, const unccComplex<__Tp>& _
     return output;
 }
 
-#endif /* MXCOMPLEXSINGLECLASS_HPP */
+#endif /* UNCC_COMPLEX_HPP */
 
