@@ -4,6 +4,10 @@ project(cpuBackProjection LANGUAGES CXX)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
+if (NOT Matlab_INCLUDE_DIRS)
+    set( Matlab_INCLUDE_DIRS "")
+endif (NOT Matlab_INCLUDE_DIRS)
+
 find_package(FFTW REQUIRED)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -DMATLAB_MEX_FILE -g -O0")
