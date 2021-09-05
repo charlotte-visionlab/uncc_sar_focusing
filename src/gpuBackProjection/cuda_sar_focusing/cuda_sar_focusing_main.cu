@@ -46,6 +46,10 @@ int main(int argc, char **argv) {
         exit(0);
     }
     bool debug = result["debug"].as<bool>();
+
+    initialize_Sandia_SPHRead(matlab_readvar_map);
+    initialize_GOTCHA_MATRead(matlab_readvar_map);
+
     std::string inputfile;
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();
@@ -60,15 +64,12 @@ int main(int argc, char **argv) {
         //        std::string filepostfix = Sandia_Farms_filepostfix;
         ss << std::setfill('0') << std::setw(2) << file_idx;
 
-        initialize_Sandia_SPHRead(matlab_readvar_map);
 
         // GOTCHA SAR DATA FILE LOADING
         int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-//        std::string fileprefix = GOTCHA_fileprefix;
-//        std::string filepostfix = GOTCHA_filepostfix;
-//        ss << std::setfill('0') << std::setw(3) << azimuth;
-
-        initialize_GOTCHA_MATRead(matlab_readvar_map);
+        //        std::string fileprefix = GOTCHA_fileprefix;
+        //        std::string filepostfix = GOTCHA_filepostfix;
+        //        ss << std::setfill('0') << std::setw(3) << azimuth;
 
         inputfile = fileprefix + ss.str() + filepostfix + ".mat";
     }
