@@ -4,8 +4,6 @@ project(cuda_sar_focusing LANGUAGES CXX CUDA)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
-find_package(CUDA)
-
 #set(CUDA_NVCC_FLAGS -Xcompiler -fPIC -use_fast_math -gencode=arch=compute_20,code="sm_20,compute_20" --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 set(CUDA_NVCC_FLAGS -Xcompiler -no-pie -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
@@ -14,31 +12,45 @@ include_directories(
     ${CUDA_INCLUDE_DIRS}
     /usr/local/cuda/samples/common/inc
     /usr/local/cuda/targets/x86_64-linux/include/
-    ${Matlab_INCLUDE_DIRS}
-    ${Matlab_ROOT_DIR}/toolbox/parallel/gpu/extern/include
-    ${Matlab_ROOT_DIR}/sys/cuda/glnxa64/cuda/include
 )
-
-add_library(${PROJECT_NAME} SHARED cuda_sar_focusing_mex.cu ${MATLAB_PROJECT_DIR}/Matlabdef.def)
-target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
-set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
 
 add_executable(cuda_sar_focusing_cmd
     cuda_sar_focusing_main.cu)
 target_link_libraries(cuda_sar_focusing_cmd -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
 #set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
-# 32-bit or 64-bit mex
-if(WIN32)
-    if (CMAKE_CL_64)
-      set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexw64)
-    else(CMAKE_CL_64)
-      set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexw32)
-    endif(CMAKE_CL_64)
-else(WIN32)
-    if (CMAKE_SIZEOF_VOID_P MATCHES "8")
-      set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexa64 PREFIX "")
-    else(CMAKE_SIZEOF_VOID_P MATCHES "8")
-      set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexglx PREFIX "")
-    endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
-endif(WIN32)
+if (Matlab_INCLUDE_DIRS)
+
+    if(MATLAB_FOUND AND CUDA_FOUND)
+        message(STATUS "CUDA and MATLAB Found, CUDA MEX will be compiled.")
+    else(MATLAB_FOUND AND CUDA_FOUND)
+        message("MATLAB or CUDA not found... CUDA accelerated MATLAB GPU code will not be built.")
+    endif(MATLAB_FOUND AND CUDA_FOUND)
+
+    #set( Matlab_INCLUDE_DIRS "")
+    include_directories(
+        ${Matlab_INCLUDE_DIRS}
+        ${Matlab_ROOT_DIR}/toolbox/parallel/gpu/extern/include
+        ${Matlab_ROOT_DIR}/sys/cuda/glnxa64/cuda/include
+    )
+
+    add_library(${PROJECT_NAME} SHARED cuda_sar_focusing_mex.cu ${MATLAB_PROJECT_DIR}/Matlabdef.def)
+    target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "" LINKER_LANGUAGE CXX)
+
+    # 32-bit or 64-bit mex
+    if(WIN32)
+        if (CMAKE_CL_64)
+          set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexw64)
+        else(CMAKE_CL_64)
+          set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexw32)
+        endif(CMAKE_CL_64)
+    else(WIN32)
+        if (CMAKE_SIZEOF_VOID_P MATCHES "8")
+          set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexa64 PREFIX "")
+        else(CMAKE_SIZEOF_VOID_P MATCHES "8")
+          set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexglx PREFIX "")
+        endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
+    endif(WIN32)
+
+endif (Matlab_INCLUDE_DIRS)
