@@ -8,7 +8,8 @@ find_package(CUDA)
 
 #set(CUDA_NVCC_FLAGS -Xcompiler -fPIC -use_fast_math -gencode=arch=compute_20,code="sm_20,compute_20" --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 set(CUDA_NVCC_FLAGS -Xcompiler -fPIC -use_fast_math ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
-if (Matlab_INCLUDE_DIRS)
+
+if (Matlab_FOUND)
     include_directories(
         ${Matlab_INCLUDE_DIRS}
     )
@@ -32,4 +33,4 @@ if (Matlab_INCLUDE_DIRS)
           set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX .mexglx PREFIX "")
         endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
     endif(WIN32)
-endif (Matlab_INCLUDE_DIRS)
+endif (Matlab_FOUND)
