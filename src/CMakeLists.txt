@@ -7,12 +7,12 @@ add_definitions(/DUSE_MEX_CMD)
 
 find_package(Matlab)
 find_package(CUDA)
+find_package(FFTW)
 
-add_subdirectory(cpuBackProjection)
+if (FFTW_FOUND)
+    add_subdirectory(cpuBackProjection)
+endif (FFTW_FOUND)
 
-if(MATLAB_FOUND AND CUDA_FOUND)
-    message(STATUS "CUDA Found, CUDA MEX will be compiled.")
+if (CUDA_FOUND)
     add_subdirectory(gpuBackProjection)
-else(MATLAB_FOUND AND CUDA_FOUND)
-    message("MATLAB or CUDA not found... CUDA accelerated GPU code will not be built.")
-endif(MATLAB_FOUND AND CUDA_FOUND)
+endif (CUDA_FOUND)
