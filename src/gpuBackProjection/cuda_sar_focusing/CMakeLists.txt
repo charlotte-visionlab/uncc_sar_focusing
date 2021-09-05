@@ -19,15 +19,14 @@ add_executable(cuda_sar_focusing_cmd
 target_link_libraries(cuda_sar_focusing_cmd -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
 #set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
-if (Matlab_INCLUDE_DIRS)
+if (Matlab_FOUND)
 
-    if(MATLAB_FOUND AND CUDA_FOUND)
+    if (CUDA_FOUND)
         message(STATUS "CUDA and MATLAB Found, CUDA MEX will be compiled.")
-    else(MATLAB_FOUND AND CUDA_FOUND)
+    else (CUDA_FOUND)
         message("MATLAB or CUDA not found... CUDA accelerated MATLAB GPU code will not be built.")
-    endif(MATLAB_FOUND AND CUDA_FOUND)
+    endif (CUDA_FOUND)
 
-    #set( Matlab_INCLUDE_DIRS "")
     include_directories(
         ${Matlab_INCLUDE_DIRS}
         ${Matlab_ROOT_DIR}/toolbox/parallel/gpu/extern/include
@@ -53,4 +52,4 @@ if (Matlab_INCLUDE_DIRS)
         endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
     endif(WIN32)
 
-endif (Matlab_INCLUDE_DIRS)
+endif (Matlab_FOUND)

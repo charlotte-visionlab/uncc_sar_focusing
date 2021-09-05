@@ -8,7 +8,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -DMATLAB_MEX_FILE -g -O0")
 
 include_directories(
     ../include
-#    ${Matlab_INCLUDE_DIRS}
     ${FFTW_INCLUDE_DIRS}
 #    ${MATIO_INCLUDE_DIRS}
 )
@@ -19,7 +18,7 @@ add_executable(cpuBackProjection_test
 target_link_libraries(cpuBackProjection_test ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
 #set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
-if (Matlab_INCLUDE_DIRS)
+if (Matlab_FOUND)
 
     #set( Matlab_INCLUDE_DIRS "")
     include_directories(
@@ -46,4 +45,4 @@ if (Matlab_INCLUDE_DIRS)
         endif (CMAKE_SIZEOF_VOID_P MATCHES "8")
     endif(WIN32)
 
-endif (Matlab_INCLUDE_DIRS)
+endif (Matlab_FOUND)
