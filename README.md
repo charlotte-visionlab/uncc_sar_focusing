@@ -6,10 +6,10 @@ A codebase for developing SAR focusing algorithms that can be run from MATLAB or
 
 This code compiles to (4) different targets:
 
-(1) a CPU-only application which depends on the libfftw3-dev package (libfftw),
-(2) a CPU-only MATLAB application which includes the dependencies of (1) and also depends on MATLAB being installed,
-(3) a GPU application which depends on CUDA, and cuFFT.
-(4) a GPU MATLAB application which includes the dependencies of (4) and also depends on MATLAB (2017 or later) being installed.
+1. a CPU-only application which depends on the libfftw3-dev package (libfftw),
+2. a CPU-only MATLAB application which includes the dependencies of (1) and also depends on MATLAB being installed,
+3. a GPU application which depends on CUDA, and cuFFT.
+4. a GPU MATLAB application which includes the dependencies of (4) and also depends on MATLAB (2017 or later) being installed.
 
 One must also have installed libhdf5-dev to run this code.
 
