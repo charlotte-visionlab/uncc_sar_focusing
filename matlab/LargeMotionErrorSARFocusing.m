@@ -1,23 +1,5 @@
 clear all; close all; clc
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This script produces images using the 2D/3D challenge problem        %
-% datset.  It uses the imaging function bpBasic for image              %
-% formation.  This script assumes a regular imaging grid with z = 0.   %
-%                                                                      %
-% Written by LeRoy Gorham, Air Force Research Laboratory, WPAFB, OH    %
-% Email:  leroy.gorham@wpafb.af.mil                                    %
-% Date Released:  8 Apr 2010                                           %
-%                                                                      %
-% Gorham, L.A. and Moore, L.J., "SAR image formation toolbox for       %
-%   MATLAB,"  Algorithms for Synthetic Aperture Radar Imagery XVII     %
-%   7669, SPIE (2010).                                                 %
-%                                                                      %
-% Casteel, C.H., et al, "A challenge problem for 2D/3D imaging of      %
-%   targets from a volumetric data set in an urban environment,"       %
-%   Altorithms for Synthetic Aperture Radar Imagery XIV 6568, SPIE     %
-%   (2007).                                                            %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear;
 % INPUT PARAMETERS START HERE %
 addpath('../build/lib');
@@ -126,6 +108,50 @@ data.y_vec = linspace(data.y0 - data.Wy/2, data.y0 + data.Wy/2, data.Ny);
 % data.y_mat = single(data.y_mat);
 data.z_mat = zeros(size(data.x_mat),'single');
 
+azimuth = atan2(data.AntY(1), data.AntX(1));
+rotXY = [cos(azimuth) -sin(azimuth) 0; sin(azimuth) cos(azimuth) 0; 0 0 1];
+trajectory_3D = [data.AntX; data.AntY; data.AntZ];
+canonicalTraj = rotXY'*trajectory_3D;
+npulses = length(data.AntX);
+noise = mvnrnd([0; 0; 0], 1e-5*eye(3), npulses);
+canonicalTraj = canonicalTraj + noise';
+data.AntX = canonicalTraj(1,:);
+data.AntY = canonicalTraj(2,:);
+data.AntZ = canonicalTraj(3,:);
+
+pulseIndex = 100;
+BATCHSIZE = 25;
+focus_pulseIndices = (pulseIndex - (BATCHSIZE - 1)):pulseIndex;
+dataWin.Wx = data.Wx;          % Scene extent x (m)
+dataWin.Wy = data.Wy;          % Scene extent y (m)
+dataWin.Nfft = data.Nfft;        % Number of samples in FFT
+dataWin.Nx = data.Nx;          % Number of samples in x direction
+dataWin.Ny = data.Ny;          % Number of samples in y direction
+dataWin.x0 = data.x0;            % Center of image scene in x direction (m)
+dataWin.y0 = data.y0;            % Center of image scene in y direction (m)
+dataWin.dyn_range = dyn_range;         % dB of dynamic range to display
+
+dataWin.AntX = data.AntX(focus_pulseIndices);
+dataWin.AntY = data.AntY(focus_pulseIndices);
+dataWin.AntZ = data.AntZ(focus_pulseIndices);
+dataWin.R0 = data.R0(focus_pulseIndices);
+dataWin.minF = data.minF(focus_pulseIndices);
+dataWin.Np = self.BATCHSIZE;
+
+x = self.packUnknowns(data, pulseIndex);
+
+minimizationErrorFunction = @(x) -calculateEntropy(x, dataWin);
+%options = optimset('Display','iter','MaxIter',50,'PlotFcns',@optimplotfval);
+options = optimset('Display','iter', 'MaxIter', 200, 'TolX', 1e-7, 'MaxFunEvals', 200);
+%x_best = fminsearch(minimizationErrornction, x, options);
+x_best = fminsearch(minimizationErrorFunction, x, options);
+%x_best = x;
+
+% optimData = self.unpackUnknowns(x_best);
+% errorX = optimData.AntX' - data.AntX(focus_pulseIndices);
+% errorY = optimData.AntY' - data.AntY(focus_pulseIndices);
+% errorZ = optimData.AntZ' - data.AntZ(focus_pulseIndices);
+
 if (false)
     % Call the backprojection function with the appropriate inputs
     data.phdata = single(data.phdata);
@@ -180,7 +206,8 @@ else
     data.AntY = single(data.AntY);
     data.AntZ = single(data.AntZ);
     data.deltaF = single(data.deltaF);
-    data = bpBasic(data);
+    %data = bpBasic(data);
+    data.im_final = zeros(data.Ny, data.Nx);
     device = 'GPU';
     tic;
     data.im_final2 = cuda_sar_focusing(data.phdata, data.freq, data.AntX, data.AntY, data.AntZ, data.R0, ...
@@ -189,16 +216,8 @@ else
 end
 % Display the image
 figure
-subplot(1,3,1), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final)./...
-    max(max(abs(data.im_final)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab BP');
-%set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
-%    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
-h = xlabel('x (m)');
-%set(h,'FontSize',14,'FontWeight''Bold');
-h = ylabel('y (m)');
-%set(h,'FontSize',14,'FontWeight','Bold');
-colorbar
-subplot(1,3,2), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final2)./...
+
+imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final2)./...
     max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title(strcat(device,' BP'));
 %set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
 %    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
@@ -207,16 +226,15 @@ h = xlabel('x (m)');
 h = ylabel('y (m)');
 %set(h,'FontSize',14,'FontWeight','Bold');
 colorbar
-subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)), ...
-    [-dyn_range 0]), colormap gray, axis xy image, title(strcat('Matlab-',device,' Difference'));
-%subplot(1,3,3), imagesc(data.x_vec,data.y_vec,20*log10(abs(data.im_final-data.im_final2)./...
-%    max(max(abs(data.im_final2)))),[-dyn_range 0]), colormap gray, axis xy image, title('Matlab-CPU Difference');
-%set(gca,'XTick',(data.x0-data.Wx)/2:data.Wx/5:(data.x0+data.Wx/2), ...
-%    'YTick',-(data.y0-data.Wy)/2:data.Wy/5:(data.y0+data.Wy/2));
-h = xlabel('x (m)');
-%set(h,'FontSize',14,'FontWeight''Bold');
-h = ylabel('y (m)');
-%set(h,'FontSize',14,'FontWeight','Bold');
-colorbar
-% set(gca,'FontSize',14,'FontWeight','Bold');
-% print -deps2 /ssip2/lgorham/SPIE10/fig/3DsarBPA.eps
+
+function unknownVec = packUnknowns(data, numPulses)
+
+end
+
+function trajXYZ = unpackUnknowns(x)
+    
+end
+
+function H = calculateEntropy(self, x, constData)
+    optimData = self.unpackUnknowns(x);
+end
