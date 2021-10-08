@@ -2,7 +2,7 @@
 #set( CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 #set( CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
-project(uncc_sar_pack LANGUAGES CXX)
+project(uncc_sar_focusing LANGUAGES CXX)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 

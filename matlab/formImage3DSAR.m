@@ -28,7 +28,7 @@ dvdPath = '../../../sar/GOTCHA/Gotcha-CP-All';
 pass = 1;               % What pass to image (1-8)
 pol = 'HH';             % What polarization to image (HH,HV,VH,VV)
 minaz = 01;             % Minimum azimuth angle (degrees)
-maxaz = 01;             % Maximum azimuth angle (degrees)
+maxaz = 05;             % Maximum azimuth angle (degrees)
 af_flag = 0;            % Use autofocus flag (Only available for HH and VV)
 taper_flag = 0;         % Add a hamming taper for sidelobe control
 
@@ -89,6 +89,9 @@ for ii = minaz:maxaz
         data.freq = newdata.data.freq;
     end
 end
+
+%zpad = (2^(ceil(log2(size(data.phdata,1)))+0)) - size(data.phdata,1)
+%data.phdata = [data.phdata; zeros(zpad, size(data.phdata,2))];
 
 % Calculate the minimum frequency for each pulse (Hz)
 data.minF = min(data.freq)*ones(size(data.R0));
@@ -166,7 +169,6 @@ else
     % to compile
     % mexcuda -v -I/usr/local/cuda-11.3/samples/common/inc CUDABackProjectionKernel.cu
     data.z_vec = zeros(1,length(data.x_vec));
-    data.phdata = single(data.phdata);
     data.freq = single(data.freq);
     %data.phdata = double(data.phdata);
     data.minF = single(data.minF);
