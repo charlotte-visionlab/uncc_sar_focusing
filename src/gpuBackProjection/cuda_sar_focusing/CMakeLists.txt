@@ -14,10 +14,12 @@ include_directories(
     /usr/local/cuda/targets/x86_64-linux/include/
 )
 
-add_executable(cuda_sar_focusing_cmd
+add_executable(uncc_sar_focusing_gpu
     cuda_sar_focusing_main.cu)
-target_link_libraries(cuda_sar_focusing_cmd -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
+target_link_libraries(uncc_sar_focusing_gpu -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
 #set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
+
+add_library(lib_uncc_sar_focusing_gpu SHARED cuda_sar_focusing_main.cu)
 
 if (Matlab_FOUND)
 

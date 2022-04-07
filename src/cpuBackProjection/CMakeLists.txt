@@ -12,11 +12,13 @@ include_directories(
 #    ${MATIO_INCLUDE_DIRS}
 )
 
-add_executable(cpuBackProjection_test
+add_executable(uncc_sar_focusing_cpu
     cpuBackProjection_main.cpp
     cpuBackProjection_fft.cpp)
-target_link_libraries(cpuBackProjection_test ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
+target_link_libraries(uncc_sar_focusing_cpu ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
 #set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
+
+add_library(lib_uncc_sar_focusing_cpu SHARED cpuBackProjection_fft.cpp)
 
 if (Matlab_FOUND)
 

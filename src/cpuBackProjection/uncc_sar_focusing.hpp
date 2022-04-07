@@ -292,7 +292,7 @@ public:
     SimpleMatrix<_numTp> ADF;
     SimpleMatrix<_numTp> startF;
     SimpleMatrix<_numTp> chirpRate;
-    SimpleMatrix<_numTp> chirpRateDelta;
+    //SimpleMatrix<_numTp> chirpRateDelta;
 
     // Fields set automatically by program computations or manually via user input arguments
     // 1 - HH, 2 -HV, 3 - VH, 4 - VV
@@ -400,7 +400,7 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
     } else {
         output << "ADF" << c.ADF << std::endl;
         output << "ChirpRate" << c.chirpRate << std::endl;
-        output << "ChirpRateDelta" << c.chirpRateDelta << std::endl;
+        //output << "ChirpRateDelta" << c.chirpRateDelta << std::endl;
     }
     return output;
 }
@@ -408,6 +408,20 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
 #define numValuesPerPolarity(sMat, pDim) sMat.nelem()/((sMat.shape.size() >= pDim && pDim != -1) ? sMat.shape[pDim] : 1)
 
 // TODO: Make this a class function for SAR_Aperture
+template<typename _numTp>
+int resize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture, int newNumRangeSamples) {
+    // resize this in the freq rows=freq/range cols=pulses/azimuth
+    SimpleMatrix<Complex<_numTp>> sampleData;
+    // GOTCHA-Only Fields
+    SimpleMatrix<_numTp> freq; // vector content changes 0....maxF in Nfft steps
+
+    // Fields below set automatically
+    int numRangeSamples; // larger the next power of 2
+    SimpleMatrix<_numTp> deltaF; // smaller --> vector content changes 0....maxF in Nfft steps
+
+    _numTp mean_deltaF; // changes
+    
+}
 
 template<typename _numTp>
 int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
@@ -425,7 +439,7 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
         std::cout << "initializeSARFocusingVariables::Not enough antenna positions available to focus the selected SAR data." << std::endl;
         return EXIT_FAILURE;
     }
-
+        
     // populate frequency sample locations for every pulse if not already available
     // also populates startF and deltaF in some cases
     if (numValuesPerPolarity(aperture.freq, polDim) != numSARSamples) {
@@ -508,7 +522,7 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
         }
     }
 
-    // populate deltaF if not already available
+    // populate deltaF if not already available 
     if (numValuesPerPolarity(aperture.deltaF, polDim) != aperture.numAzimuthSamples) {
         _numTp deltaF = std::abs(aperture.freq.data[1] - aperture.freq.data[0]);
         for (int azIdx = 0; azIdx < aperture.numAzimuthSamples; ++azIdx) {
@@ -651,7 +665,7 @@ public:
 
         return image_params;
     }
-
+    
     CUDAFUNCTION ~SAR_ImageFormationParameters() {
     };
 

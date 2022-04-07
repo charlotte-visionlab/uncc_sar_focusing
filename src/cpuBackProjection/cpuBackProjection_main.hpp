@@ -61,7 +61,7 @@ void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matla
     matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
     matlab_readvar_map["sph_MATData.preamble.ADF"] = NULL;
     matlab_readvar_map["sph_MATData.Data.ChirpRate"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.ChirpRateDelta"] = NULL;
+    //    matlab_readvar_map["sph_MATData.Data.ChirpRateDelta"] = NULL;
     matlab_readvar_map["sph_MATData.Data.SampleData"] = NULL;
     matlab_readvar_map["sph_MATData.Data.StartF"] = NULL;
     matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.x"] = NULL;
@@ -90,6 +90,44 @@ void cxxopts_integration(cxxopts::Options& options) {
             ;
 }
 
+template<typename _src_numTp, typename _dst_numTp>
+int import_Vector(_src_numTp *data, int *dims, int ndims, SimpleMatrix<_dst_numTp>& sMat) {
+    int totalsize = 1;
+    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
+        sMat.shape.push_back(dims[dimIdx]);
+        totalsize = totalsize * dims[dimIdx];
+    }
+    char *dp = (char *) data;
+    sMat.data.insert(sMat.data.end(), (_src_numTp *) dp, (_src_numTp *) (dp + dims[0] * dims[1] * sizeof(_src_numTp)));
+    return EXIT_SUCCESS;
+}
+
+template<typename _src_realTp, typename _dst_realTp>
+int import_MatrixReal(_src_realTp *data, int *dims, int ndims, SimpleMatrix<_dst_realTp>& sMat) {
+    int totalsize = 1;
+    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
+        sMat.shape.push_back(dims[dimIdx]);
+        totalsize = totalsize * dims[dimIdx];
+    }
+    char *dp = (char *) data;
+    sMat.data.insert(sMat.data.end(), (_src_realTp *) & data[0], (_src_realTp *) (dp + totalsize * sizeof (_src_realTp)));
+    return EXIT_SUCCESS;
+}
+
+template<typename _src_complexTp, typename _dst_complexTp>
+int import_MatrixComplex(Complex<_src_complexTp>* data, int *dims, int ndims, SimpleMatrix<_dst_complexTp>& sMat) {
+    int totalsize = 1;
+    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
+        sMat.shape.push_back(dims[dimIdx]);
+        totalsize = totalsize * dims[dimIdx];
+    }
+    size_t stride = sizeof (_src_complexTp);
+    for (int idx = 0; idx < totalsize; idx++) {
+        //sMat.data.push_back(_dst_complexTp(*(float*) (rp + idx * stride), *(float*) (ip + idx * stride)));
+    }
+    return EXIT_SUCCESS;
+}
+
 template<typename _numTp>
 int import_MATVector(matvar_t* matVar, SimpleMatrix<_numTp>& sMat) {
     int ndims = matVar->rank;
@@ -110,7 +148,9 @@ int import_MATVector(matvar_t* matVar, SimpleMatrix<_numTp>& sMat) {
             break;
         default:
             std::cout << "import_MATVector::Type of data not recognized!" << std::endl;
+            return EXIT_FAILURE;            
     }
+    return EXIT_SUCCESS;
 }
 
 template<typename _realTp>
@@ -199,8 +239,6 @@ int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, SAR_Aperture<
         import_MATMatrixReal(matVar, aperture.Ant_z);
     } else if (fieldname == "sph_MATData.Data.ChirpRate") {
         import_MATMatrixReal(matVar, aperture.chirpRate);
-    } else if (fieldname == "sph_MATData.Data.ChirpRateDelta") {
-        import_MATMatrixReal(matVar, aperture.chirpRateDelta);
     } else if (fieldname == "sph_MATData.preamble.ADF") {
         import_MATMatrixReal(matVar, aperture.ADF);
     } else {
@@ -356,7 +394,7 @@ int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
                 }
                 return std::max(abs_a, abs_b);
             });
-            
+
     bool flipY = false;
     bool flipX = true;
     int srcIndex;

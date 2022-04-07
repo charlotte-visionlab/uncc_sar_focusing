@@ -14,21 +14,24 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include <iomanip>
+#include <sstream>
+
+#include <cxxopts.hpp>
+
 // this declaration needs to be in any C++ compiled target for CPU
-#define CUDAFUNCTION __host__ __device__
+#define CUDAFUNCTION
 
-// Standard Library includes
-#include <stdio.h>  /* printf */
-#include <time.h>
-
-#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
-#include "../../cpuBackProjection/cpuBackProjection_main.hpp"
-
-#include "cuda_sar_focusing.hpp"
+#include "../cpuBackProjection/uncc_sar_focusing.hpp"
+#include "../cpuBackProjection/cpuBackProjection.hpp"
+#include "../cpuBackProjection/cpuBackProjection_main.hpp"
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
 using ComplexArrayType = CArray<NumericType>;
+
+
 
 int main(int argc, char **argv) {
     ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
@@ -46,30 +49,29 @@ int main(int argc, char **argv) {
         exit(0);
     }
     bool debug = result["debug"].as<bool>();
+    std::string inputfile;
 
     initialize_Sandia_SPHRead(matlab_readvar_map);
     initialize_GOTCHA_MATRead(matlab_readvar_map);
 
-    std::string inputfile;
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();
     } else {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        int file_idx = 9; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
         std::string fileprefix = Sandia_RioGrande_fileprefix;
         std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
         //        std::string filepostfix = Sandia_Farms_filepostfix;
         ss << std::setfill('0') << std::setw(2) << file_idx;
 
-
         // GOTCHA SAR DATA FILE LOADING
-        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-        //        std::string fileprefix = GOTCHA_fileprefix;
-        //        std::string filepostfix = GOTCHA_filepostfix;
-        //        ss << std::setfill('0') << std::setw(3) << azimuth;
+        //int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+        //std::string fileprefix = GOTCHA_fileprefix;
+        //std::string filepostfix = GOTCHA_filepostfix;
+        //ss << std::setfill('0') << std::setw(3) << azimuth;
 
         inputfile = fileprefix + ss.str() + filepostfix + ".mat";
     }
@@ -101,58 +103,25 @@ int main(int argc, char **argv) {
     }
     if (SAR_aperture_data.sampleData.shape.size() > 2) {
         SAR_aperture_data.format_GOTCHA = false;
+    }
+    if (!SAR_aperture_data.format_GOTCHA) {
         // the dimensional index of the polarity index in the 
         // multi-dimensional array (for Sandia SPH SAR data)
         SAR_aperture_data.polarity_dimension = 2;
     }
-
-    SAR_ImageFormationParameters<NumericType> SAR_image_params =
-            SAR_ImageFormationParameters<NumericType>();
-
-    // to increase the frequency samples to a power of 2
-    SAR_image_params.N_fft = (int) 0x01 << (int) (ceil(log2(SAR_aperture_data.numRangeSamples)));
-    //SAR_image_params.N_fft = aperture.numRangeSamples;
-    SAR_image_params.N_x_pix = SAR_aperture_data.numAzimuthSamples;
-    //SAR_image_params.N_y_pix = image_params.N_fft;
-    SAR_image_params.N_y_pix = SAR_aperture_data.numRangeSamples;
-    // focus image on target phase center
-    // Determine the maximum scene size of the image (m)
-    // max down-range/fast-time/y-axis extent of image (m)
-    SAR_image_params.max_Wy_m = CLIGHT / (2.0 * SAR_aperture_data.mean_deltaF);
-    // max cross-range/fast-time/x-axis extent of image (m)
-    SAR_image_params.max_Wx_m = CLIGHT / (2.0 * std::abs(SAR_aperture_data.mean_Ant_deltaAz) * SAR_aperture_data.mean_startF);
-
-    // default view is 100% of the maximum possible view
-    SAR_image_params.Wx_m = 1.00 * SAR_image_params.max_Wx_m;
-    SAR_image_params.Wy_m = 1.00 * SAR_image_params.max_Wy_m;
-    // make reconstructed image equal size in (x,y) dimensions
-    SAR_image_params.N_x_pix = (int) ((float) SAR_image_params.Wx_m * SAR_image_params.N_y_pix) / SAR_image_params.Wy_m;
-    // Determine the resolution of the image (m)
-    SAR_image_params.slant_rangeResolution = CLIGHT / (2.0 * SAR_aperture_data.mean_bandwidth);
-    SAR_image_params.ground_rangeResolution = SAR_image_params.slant_rangeResolution / std::sin(SAR_aperture_data.mean_Ant_El);
-    SAR_image_params.azimuthResolution = CLIGHT / (2.0 * SAR_aperture_data.Ant_totalAz * SAR_aperture_data.mean_startF);
-
-    initialize_SAR_Aperture_Data(SAR_aperture_data);
     // Print out data after critical data fields for SAR focusing have been computed
+    initialize_SAR_Aperture_Data(SAR_aperture_data);
+
     std::cout << SAR_aperture_data << std::endl;
 
-    SAR_Aperture<NumericType> SAR_focusing_data;
-    if (!SAR_aperture_data.format_GOTCHA) {
-        //SAR_aperture_data.exportData(SAR_focusing_data, SAR_aperture_data.polarity_channel);
-        SAR_aperture_data.exportData(SAR_focusing_data, 2);
-    } else {
-        SAR_focusing_data = SAR_aperture_data;
-    }
+    SAR_ImageFormationParameters<NumericType> SAR_image_params =
+            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_aperture_data);
 
-    //    SAR_ImageFormationParameters<NumericType> SAR_image_params =
-    //            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_focusing_data);
-
-    std::cout << "Data for focusing" << std::endl;
-    std::cout << SAR_focusing_data << std::endl;
+    std::cout << SAR_image_params << std::endl;
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image);
+    focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();

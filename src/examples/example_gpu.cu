@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 // this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION __host__ __device__
 
@@ -21,14 +22,17 @@
 #include <stdio.h>  /* printf */
 #include <time.h>
 
-#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
-#include "../../cpuBackProjection/cpuBackProjection_main.hpp"
+#include "../cpuBackProjection/uncc_sar_focusing.hpp"
+#include "../cpuBackProjection/cpuBackProjection_main.hpp"
 
-#include "cuda_sar_focusing.hpp"
+#include "../gpuBackProjection/cuda_sar_focusing/cuda_sar_focusing.hpp"
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
 using ComplexArrayType = CArray<NumericType>;
+
+
+
 
 int main(int argc, char **argv) {
     ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};

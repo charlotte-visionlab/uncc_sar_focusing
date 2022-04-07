@@ -18,3 +18,5 @@ endif (FFTW_FOUND)
 if (CUDA_FOUND)
     add_subdirectory(gpuBackProjection)
 endif (CUDA_FOUND)
+
+add_subdirectory(examples)

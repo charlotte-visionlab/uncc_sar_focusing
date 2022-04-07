@@ -6,8 +6,8 @@ project(uncc_sar_focusing LANGUAGES CXX)
 
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
-#set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2020a")
-set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2021a")
+set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2020a")
+#set( Matlab_ROOT_DIR "/usr/local/bin/matlab/R2021a")
 set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
