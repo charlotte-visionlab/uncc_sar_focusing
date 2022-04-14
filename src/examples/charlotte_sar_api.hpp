@@ -25,13 +25,34 @@
 #ifndef EXTERNAL_API_HPP
 #define EXTERNAL_API_HPP
 
-#include "example_gpu.hpp"
+//#include "example_gpu.hpp"
+#include <valarray>
+#include "../cpuBackProjection/uncc_complex.hpp"
+
+//template<typename __nTp>
+//using Complex = unccComplex<__nTp>;
 
 template<typename __nTp>
-int sar_data_callback(
+int sph_sar_data_callback_cpu(
         int sph_MATData_total_pulses,
         __nTp sph_MATData_preamble_ADF,
-        Complex<__nTp> *sph_MATData_Data_SampleData,
+        __nTp *sph_MATData_Data_ChirpRate,
+        __nTp *sph_MATData_Data_SampleData,
+        int numSamples,
+        __nTp *sph_MATData_Data_StartF,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_x,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_y,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_z,
+        int numPulses) {
+    //SAR_Aperture<NumericType> SAR_aperture_data;
+    //if (read_MAT_Variables(inputfile, matlab_readvar_map, SAR_aperture_data) == EXIT_FAILURE) {
+}
+
+template<typename __nTp>
+int sph_sar_data_callback_gpu(
+        int sph_MATData_total_pulses,
+        __nTp sph_MATData_preamble_ADF,
+        __nTp *sph_MATData_Data_SampleData,
         int numSamples,
         __nTp *sph_MATData_Data_StartF,
         __nTp *sph_MATData_Data_ChirpRate,
@@ -39,7 +60,21 @@ int sar_data_callback(
         __nTp *sph_MATData_Data_radarCoordinateFrame_y,
         __nTp *sph_MATData_Data_radarCoordinateFrame_z,
         int numPulses) {
-    
+}
+
+template<typename __nTp>
+int sar_data_callback(
+        int sph_MATData_total_pulses,
+        __nTp sph_MATData_preamble_ADF,
+        __nTp *sph_MATData_Data_SampleData,
+        int numSamples,
+        __nTp *sph_MATData_Data_StartF,
+        __nTp *sph_MATData_Data_ChirpRate,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_x,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_y,
+        __nTp *sph_MATData_Data_radarCoordinateFrame_z,
+        int numPulses) {
+
     sph_sar_data_callback_gpu<__nTp>(
             sph_MATData_total_pulses,
             sph_MATData_preamble_ADF,
@@ -53,5 +88,6 @@ int sar_data_callback(
             numPulses);
 }
 
+//typedef sandia_sar_data_callback sar_data_callback<float>
 #endif /* EXTERNAL_API_HPP */
 

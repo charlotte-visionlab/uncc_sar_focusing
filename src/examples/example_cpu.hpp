@@ -24,38 +24,38 @@
 #ifndef EXAMPLE_CPU_HPP
 #define EXAMPLE_CPU_HPP
 
-template<typename _numTp>
-int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, SAR_Aperture<_numTp>& aperture) {
-    if (fieldname == "sph_MATData.Data.SampleData") {
-        if (!matVar->isComplex) {
-            std::cout << "import_GOTCHA_MATData::Phase data is not complex-valued!" << std::endl;
-            return EXIT_FAILURE;
-        }
-        import_MATMatrixComplex(matVar, aperture.sampleData);
-    } else if (fieldname == "sph_MATData.Data.StartF") {
-        import_MATMatrixReal(matVar, aperture.startF);
-    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.x") {
-        import_MATMatrixReal(matVar, aperture.Ant_x);
-    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.y") {
-        import_MATMatrixReal(matVar, aperture.Ant_y);
-    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.z") {
-        import_MATMatrixReal(matVar, aperture.Ant_z);
-    } else if (fieldname == "sph_MATData.Data.ChirpRate") {
-        import_MATMatrixReal(matVar, aperture.chirpRate);
-    } else if (fieldname == "sph_MATData.preamble.ADF") {
-        import_MATMatrixReal(matVar, aperture.ADF);
-    } else {
-        std::cout << "import_Sandia_MATData::Fieldname " << fieldname << " not recognized.";
-        return EXIT_FAILURE;
-    }
-    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
-    return EXIT_SUCCESS;
-}
+//template<typename _numTp>
+//int import_Sandia_MATData(matvar_t* matVar, std::string fieldname, SAR_Aperture<_numTp>& aperture) {
+//    if (fieldname == "sph_MATData.Data.SampleData") {
+//        if (!matVar->isComplex) {
+//            std::cout << "import_GOTCHA_MATData::Phase data is not complex-valued!" << std::endl;
+//            return EXIT_FAILURE;
+//        }
+//        import_MATMatrixComplex(matVar, aperture.sampleData);
+//    } else if (fieldname == "sph_MATData.Data.StartF") {
+//        import_MATMatrixReal(matVar, aperture.startF);
+//    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.x") {
+//        import_MATMatrixReal(matVar, aperture.Ant_x);
+//    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.y") {
+//        import_MATMatrixReal(matVar, aperture.Ant_y);
+//    } else if (fieldname == "sph_MATData.Data.radarCoordinateFrame.z") {
+//        import_MATMatrixReal(matVar, aperture.Ant_z);
+//    } else if (fieldname == "sph_MATData.Data.ChirpRate") {
+//        import_MATMatrixReal(matVar, aperture.chirpRate);
+//    } else if (fieldname == "sph_MATData.preamble.ADF") {
+//        import_MATMatrixReal(matVar, aperture.ADF);
+//    } else {
+//        std::cout << "import_Sandia_MATData::Fieldname " << fieldname << " not recognized.";
+//        return EXIT_FAILURE;
+//    }
+//    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
+//    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
+//    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
+//    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
+//    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
+//    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
+//    return EXIT_SUCCESS;
+//}
 
 template<typename __nTp>
 int sph_sar_data_callback_cpu(

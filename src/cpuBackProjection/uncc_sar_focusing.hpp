@@ -195,7 +195,25 @@ private:
     }
 
 public:
+    // converts the matrix to a vector using column-major order
 
+    template <typename __dstTp>
+    std::vector<__dstTp> toVector() {
+        int numElems = nelem();
+        std::vector<__dstTp> vecdata(numElems);
+        for (int idx = 0; idx < numElems; idx++) {
+            vecdata.push_back((__dstTp) data[idx]);
+        }
+    }
+    
+    std::vector<__numTp> toVector() {
+        int numElems = nelem();
+        std::vector<__numTp> vecdata(numElems);
+        for (int idx = 0; idx < numElems; idx++) {
+            vecdata.push_back(data[idx]);
+        }
+    }    
+    
     std::vector<__numTp> getData(std::vector<std::vector<int>> idxs) {
         std::vector<__numTp> data;
         std::vector<int> b(idxs.size(), 0);

@@ -23,6 +23,8 @@
 // this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION
 
+#include "charlotte_sar_api.hpp"
+
 #include "../cpuBackProjection/uncc_sar_focusing.hpp"
 #include "../cpuBackProjection/cpuBackProjection.hpp"
 #include "../cpuBackProjection/cpuBackProjection_main.hpp"
@@ -30,8 +32,6 @@
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
 using ComplexArrayType = CArray<NumericType>;
-
-
 
 int main(int argc, char **argv) {
     ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
@@ -121,7 +121,60 @@ int main(int argc, char **argv) {
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
+    // Allocate memory for data to pass to library function call
+    NumericType sph_MATData_preamble_ADF;
+    NumericType sph_MATData_Data_SampleData[2 * SAR_aperture_data.numRangeSamples * SAR_aperture_data.numAzimuthSamples];
+    NumericType sph_MATData_Data_StartF[SAR_aperture_data.numAzimuthSamples];
+    NumericType sph_MATData_Data_ChirpRate[SAR_aperture_data.numAzimuthSamples];
+    NumericType sph_MATData_Data_radarCoordinateFrame_x[SAR_aperture_data.numAzimuthSamples];
+    NumericType sph_MATData_Data_radarCoordinateFrame_y[SAR_aperture_data.numAzimuthSamples];
+    NumericType sph_MATData_Data_radarCoordinateFrame_z[SAR_aperture_data.numAzimuthSamples];
+    
+    //std::vector<std::vector<int>> adf_index {{0}};
+    //sph_MATData_preamble_ADF = (NumericType) SAR_aperture_data.ADF.getData(adf_index).at(0);
+    std::vector<NumericType> vec_ADF = SAR_aperture_data.ADF.toVector<NumericType>();
+    sph_MATData_preamble_ADF = vec_ADF[0];
+
+    std::vector<ComplexType> vec_SampleData = SAR_aperture_data.sampleData.toVector();
+    //sph_MATData_Data_SampleData
+            
+    std::vector<std::vector<int>> pulse_indices;    
+    std::vector<int> pulse_index_values;
+    for (int i=0; i < SAR_aperture_data.numAzimuthSamples; i++) {        
+        pulse_index_values.push_back(i);
+    }
+    pulse_indices.push_back(pulse_index_values);
+    //    std::vector<NumericType> vec_StartF = SAR_aperture_data.startF.getData(pulse_indices);
+    //    std::vector<NumericType> vec_ChirpRate = SAR_aperture_data.chirpRate.getData(pulse_indices);
+    //    std::vector<NumericType> vec_radarCoordinateFrame_x = SAR_aperture_data.Ant_x.getData(pulse_indices);
+    //    std::vector<NumericType> vec_radarCoordinateFrame_y = SAR_aperture_data.Ant_y.getData(pulse_indices);
+    //    std::vector<NumericType> vec_radarCoordinateFrame_z = SAR_aperture_data.Ant_z.getData(pulse_indices);
+    std::vector<NumericType> vec_StartF = SAR_aperture_data.startF.toVector<NumericType>();
+    std::vector<NumericType> vec_ChirpRate = SAR_aperture_data.chirpRate.toVector<NumericType>();
+    std::vector<NumericType> vec_radarCoordinateFrame_x = SAR_aperture_data.Ant_x.toVector<NumericType>();
+    std::vector<NumericType> vec_radarCoordinateFrame_y = SAR_aperture_data.Ant_y.toVector<NumericType>();
+    std::vector<NumericType> vec_radarCoordinateFrame_z = SAR_aperture_data.Ant_z.toVector<NumericType>();
+    for (int i=0; i < SAR_aperture_data.numAzimuthSamples; i++) {        
+        sph_MATData_Data_StartF[i] = vec_StartF[i];
+        sph_MATData_Data_ChirpRate[i] = vec_ChirpRate[i];
+        sph_MATData_Data_radarCoordinateFrame_x[i] = vec_radarCoordinateFrame_x[i];
+        sph_MATData_Data_radarCoordinateFrame_y[i] = vec_radarCoordinateFrame_y[i];
+        sph_MATData_Data_radarCoordinateFrame_z[i] = vec_radarCoordinateFrame_z[i];
+    }
+        
+    //focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
+    sar_data_callback<NumericType>(
+            SAR_aperture_data.numAzimuthSamples,    
+            sph_MATData_preamble_ADF,
+            sph_MATData_Data_SampleData,
+            SAR_aperture_data.numRangeSamples,
+            sph_MATData_Data_StartF,
+            sph_MATData_Data_ChirpRate,
+            sph_MATData_Data_radarCoordinateFrame_x,
+            sph_MATData_Data_radarCoordinateFrame_y,
+            sph_MATData_Data_radarCoordinateFrame_z,
+            SAR_aperture_data.numAzimuthSamples
+            );
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();
