@@ -136,7 +136,13 @@ int main(int argc, char **argv) {
     sph_MATData_preamble_ADF = vec_ADF[0];
 
     std::vector<ComplexType> vec_SampleData = SAR_aperture_data.sampleData.toVector();
-    //sph_MATData_Data_SampleData
+    
+    int cmplx_index = 0;
+    for (std::vector<ComplexType>::iterator cmplx_val = vec_SampleData.begin(); cmplx_val != vec_SampleData.end(); cmplx_val++) {        
+        std::cout << *cmplx_val << std::endl;
+        sph_MATData_Data_SampleData[cmplx_index*2 + 0] = cmplx_val->_M_real;
+        sph_MATData_Data_SampleData[cmplx_index*2 + 1] = cmplx_val->_M_imag;        
+    }
             
     std::vector<std::vector<int>> pulse_indices;    
     std::vector<int> pulse_index_values;
