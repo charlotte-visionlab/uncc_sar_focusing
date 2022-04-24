@@ -125,7 +125,7 @@ int sph_sar_data_callback_cpu(
     return EXIT_SUCCESS;
 }
 
-template int sph_sar_data_callback_cpu<float>(float, float*, int, float*, float*, float*, float*, float*, int);
+//template int sph_sar_data_callback_cpu<float>(float, float*, int, float*, float*, float*, float*, float*, int);
 //template int sph_sar_data_callback_cpu<double>(double, double*, int, double*, double*, double*, double*, double*, int);
 
 #endif /* EXAMPLE_CPU_HPP */
