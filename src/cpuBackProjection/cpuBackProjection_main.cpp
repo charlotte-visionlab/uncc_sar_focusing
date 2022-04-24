@@ -18,14 +18,14 @@
 #include <iomanip>
 #include <sstream>
 
-#include <cxxopts.hpp>
-
 // this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION
 
-#include "uncc_sar_focusing.hpp"
+#include <uncc_sar_focusing.hpp>
+#include <uncc_sar_globals.hpp>
+#include <uncc_sar_matio.hpp>
+
 #include "cpuBackProjection.hpp"
-#include "cpuBackProjection_main.hpp"
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;

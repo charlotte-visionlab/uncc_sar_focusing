@@ -5,21 +5,25 @@ project(cuda_sar_focusing LANGUAGES CXX CUDA)
 set( CMAKE_VERBOSE_MAKEFILE ON)
 
 #set(CUDA_NVCC_FLAGS -Xcompiler -fPIC -use_fast_math -gencode=arch=compute_20,code="sm_20,compute_20" --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
-set(CUDA_NVCC_FLAGS -Xcompiler -no-pie -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
+set(CUDA_NVCC_FLAGS -Xcompiler -no-pie -fPIC --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
 include_directories(
     ../../include
     ${CUDA_INCLUDE_DIRS}
-    /usr/local/cuda/samples/common/inc
-    /usr/local/cuda/targets/x86_64-linux/include/
+    ${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc
+    ${CUDA_TOOLKIT_ROOT_DIR}/targets/x86_64-linux/include/
 )
 
 add_executable(uncc_sar_focusing_gpu
-    cuda_sar_focusing_main.cu)
+    cuda_sar_focusing_main.cu
+    ../../core/uncc_sar_matio.cpp)
 target_link_libraries(uncc_sar_focusing_gpu -no-pie ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
 #set_target_properties(gpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
-add_library(lib_uncc_sar_focusing_gpu SHARED cuda_sar_focusing_main.cu)
+add_library(lib_uncc_sar_focusing_gpu SHARED 
+    libcuda_sar_focusing.cu 
+    ../../core/uncc_sar_matio.cpp
+    ../../core/charlotte_sar_api.cpp)
 
 if (Matlab_FOUND)
 

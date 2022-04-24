@@ -17,7 +17,8 @@
 
 #define CUDAFUNCTION 
 
-#include "uncc_sar_focusing.hpp"
+#include <uncc_sar_focusing.hpp>
+
 #include "cpuBackProjection.hpp"
 #include "cpuBackProjection_mex.hpp"
 

@@ -70,3 +70,14 @@ void fftw_engine(CArray<double>& x, int DIR) {
         x /= x.size();
     }
 }
+
+/*
+template void focus_SAR_image(const SAR_Aperture<float>& SARData,
+        const SAR_ImageFormationParameters<float>& SARImgParams,
+        CArray<float>& output_image);
+
+template void focus_SAR_image(const SAR_Aperture<double>& SARData,
+        const SAR_ImageFormationParameters<double>& SARImgParams,
+        CArray<double>& output_image);
+*/
+

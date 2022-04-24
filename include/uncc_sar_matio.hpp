@@ -15,118 +15,26 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef CPUBACKPROJECTION_MAIN_HPP
-#define CPUBACKPROJECTION_MAIN_HPP
+/* 
+ * File:   uncc_sar_matlab.hpp
+ * Author: arwillis
+ *
+ * Created on April 24, 2022, 7:03 AM
+ */
 
-#include <complex>
-#include <numeric>
+#ifndef UNCC_SAR_MATLAB_HPP
+#define UNCC_SAR_MATLAB_HPP
 
-#include <cxxopts.hpp>
+#include <unordered_map>
 
 #include <matio.h>
 
-#define LOADBMP_IMPLEMENTATION
-#include <loadbmp.h>
+#include "uncc_sar_focusing.hpp"
+#include "uncc_simplematrix.hpp"
 
-#include "cpuBackProjection.hpp"
+void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*>& matlab_readvar_map);
 
-std::string HARDCODED_SARDATA_PATH = "/home/arwillis/sar/";
-
-std::string Sandia_RioGrande_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Rio_Grande_UUR_SAND2021-1834_O/SPH/PHX1T03_PS0008_PT0000";
-// index here is 2 digit file index [00,...,10]
-std::string Sandia_RioGrande_filepostfix = "";
-std::string Sandia_Farms_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Farms_UUR_SAND2021-1835_O/SPH/0506P19_PS0020_PT0000";
-// index here is 2 digit file index [00,...,09]
-std::string Sandia_Farms_filepostfix = "_N03_M1";
-
-// azimuth=[1,...,360] for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
-std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/DATA/pass1/HH/data_3dsar_pass1_az";
-// index here is 3 digit azimuth [001,...,360]
-std::string GOTCHA_filepostfix = "_HH";
-
-void initialize_GOTCHA_MATRead(std::unordered_map<std::string, matvar_t*>& matlab_readvar_map) {
-    matlab_readvar_map["data.fp"] = NULL;
-    matlab_readvar_map["data.freq"] = NULL;
-    matlab_readvar_map["data.x"] = NULL;
-    matlab_readvar_map["data.y"] = NULL;
-    matlab_readvar_map["data.z"] = NULL;
-    matlab_readvar_map["data.r0"] = NULL;
-    matlab_readvar_map["data.th"] = NULL;
-    matlab_readvar_map["data.phi"] = NULL;
-    matlab_readvar_map["data.af.r_correct"] = NULL;
-    matlab_readvar_map["data.af.ph_correct"] = NULL;
-}
-
-void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map) {
-    matlab_readvar_map["sph_MATData.total_pulses"] = NULL;
-    matlab_readvar_map["sph_MATData.preamble.ADF"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.ChirpRate"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.ChirpRateDelta"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.SampleData"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.StartF"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.x"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.y"] = NULL;
-    matlab_readvar_map["sph_MATData.Data.radarCoordinateFrame.z"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelEast"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelNorth"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.VelDown"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.xat"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.yon"] = NULL;
-    //    matlab_readvar_map["sph_MATData.Data.RxPos.zae"] = NULL;
-}
-
-// For details see: https://github.com/jarro2783/cxxopts
-
-void cxxopts_integration(cxxopts::Options& options) {
-
-    options.add_options()
-            ("i,input", "Input file", cxxopts::value<std::string>())
-            //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
-            ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
-            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
-            ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
-            ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
-            ("h,help", "Print usage")
-            ;
-}
-
-template<typename _src_numTp, typename _dst_numTp>
-int import_Vector(_src_numTp *data, int *dims, int ndims, SimpleMatrix<_dst_numTp>& sMat) {
-    int totalsize = 1;
-    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
-        sMat.shape.push_back(dims[dimIdx]);
-        totalsize = totalsize * dims[dimIdx];
-    }
-    char *dp = (char *) data;
-    sMat.data.insert(sMat.data.end(), (_src_numTp *) dp, (_src_numTp *) (dp + dims[0] * dims[1] * sizeof(_src_numTp)));
-    return EXIT_SUCCESS;
-}
-
-template<typename _src_realTp, typename _dst_realTp>
-int import_MatrixReal(_src_realTp *data, int *dims, int ndims, SimpleMatrix<_dst_realTp>& sMat) {
-    int totalsize = 1;
-    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
-        sMat.shape.push_back(dims[dimIdx]);
-        totalsize = totalsize * dims[dimIdx];
-    }
-    char *dp = (char *) data;
-    sMat.data.insert(sMat.data.end(), (_src_realTp *) & data[0], (_src_realTp *) (dp + totalsize * sizeof (_src_realTp)));
-    return EXIT_SUCCESS;
-}
-
-template<typename _src_complexTp, typename _dst_complexTp>
-int import_MatrixComplex(Complex<_src_complexTp>* data, int *dims, int ndims, SimpleMatrix<_dst_complexTp>& sMat) {
-    int totalsize = 1;
-    for (int dimIdx = 0; dimIdx < ndims; dimIdx++) {
-        sMat.shape.push_back(dims[dimIdx]);
-        totalsize = totalsize * dims[dimIdx];
-    }
-    size_t stride = sizeof (_src_complexTp);
-    for (int idx = 0; idx < totalsize; idx++) {
-        //sMat.data.push_back(_dst_complexTp(*(float*) (rp + idx * stride), *(float*) (ip + idx * stride)));
-    }
-    return EXIT_SUCCESS;
-}
+void initialize_Sandia_SPHRead(std::unordered_map<std::string, matvar_t*> &matlab_readvar_map);
 
 template<typename _numTp>
 int import_MATVector(matvar_t* matVar, SimpleMatrix<_numTp>& sMat) {
@@ -376,58 +284,5 @@ int read_MAT_Variables(std::string inputfile,
     return EXIT_SUCCESS;
 }
 
-template<typename __nTp, typename __pTp>
-int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,
-        const CArray<__nTp>& output_image, const std::string& output_filename) {
-
-    unsigned int width = SARImgParams.N_x_pix, height = SARImgParams.N_y_pix;
-    std::vector<unsigned char> pixels;
-    float max_val = std::accumulate(std::begin(output_image), std::end(output_image), 0.0f,
-            [](const Complex<__nTp>& a, const Complex<__nTp> & b) {
-                auto abs_a = Complex<__nTp>::abs(a);
-                auto abs_b = Complex<__nTp>::abs(b);
-                //auto abs_a = std::abs(a);
-                //auto abs_b = std::abs(b);
-                if (abs_a == abs_b) {
-                    //return std::max(arg(a), arg(b));
-                    return abs_a;
-                }
-                return std::max(abs_a, abs_b);
-            });
-
-    bool flipY = false;
-    bool flipX = true;
-    int srcIndex;
-    for (int y_dstIndex = 0; y_dstIndex < SARImgParams.N_y_pix; y_dstIndex++) {
-        for (int x_dstIndex = 0; x_dstIndex < SARImgParams.N_x_pix; x_dstIndex++) {
-            if (flipX && flipY) {
-                srcIndex = (SARImgParams.N_x_pix - 1 - x_dstIndex) * SARImgParams.N_y_pix + SARImgParams.N_y_pix - 1 - y_dstIndex;
-            } else if (flipY) {
-                srcIndex = (SARImgParams.N_x_pix - 1 - x_dstIndex) * SARImgParams.N_y_pix + y_dstIndex;
-            } else if (flipX) {
-                srcIndex = x_dstIndex * SARImgParams.N_y_pix + SARImgParams.N_y_pix - 1 - y_dstIndex;
-            } else {
-                srcIndex = x_dstIndex * SARImgParams.N_y_pix + y_dstIndex;
-            }
-            const Complex<__nTp>& SARpixel = output_image[srcIndex];
-            //float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
-            //        ((20 * std::log10(std::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
-            float pixelf = (float) (255.0 / SARImgParams.dyn_range_dB)*
-                    ((20 * std::log10(Complex<__nTp>::abs(SARpixel) / max_val)) + SARImgParams.dyn_range_dB);
-            unsigned char pixel = (pixelf < 0) ? 0 : (unsigned char) pixelf;
-            // insert 4 copies of the pixel value
-            pixels.insert(pixels.end(), 4, pixel);
-        }
-    }
-
-    unsigned int err = loadbmp_encode_file(output_filename.c_str(),
-            &pixels[0], width, height, LOADBMP_RGBA);
-
-    if (err) {
-        std::cout << "writeBMPFile::LoadBMP error = " << err << " when saving image to file " << std::endl;
-        return EXIT_FAILURE;
-    }
-    return EXIT_SUCCESS;
-}
-#endif /* CPUBACKPROJECTION_MAIN_HPP */
+#endif /* UNCC_SAR_MATLAB_HPP */
 

@@ -43,7 +43,7 @@
 #define USE_FAST_MATH 0     /* Use __math() functions? */
 #define USE_RSQRT     0
 
-#define ZEROCOPY      1
+#define ZEROCOPY      0
 
 class CUDADevice_ArrayMappedMemory {
 public:
@@ -96,14 +96,14 @@ public:
     cudaDeviceProp props;
 
     std::unordered_map<std::string, CUDADevice_ArrayMappedMemory> gpu_mmap;
-    
+
     int createOnZero(std::string name, size_t size_in_bytes) {
         if (gpu_mmap.find(name) != gpu_mmap.end()) {
             std::cout << "createOnDevice::Failure to export data with the name \"" + name + "\". The name already exists in the GPU memory map." << std::endl;
             return EXIT_FAILURE;
         }
         CUDADevice_ArrayMappedMemory gpu_mem(nullptr, size_in_bytes);
-        MY_CUDA_SAFE_CALL(cudaHostAlloc(&gpu_mem.host_mem, size_in_bytes,cudaHostAllocMapped));
+        MY_CUDA_SAFE_CALL(cudaHostAlloc(&gpu_mem.host_mem, size_in_bytes, cudaHostAllocMapped));
         MY_CUDA_SAFE_CALL(cudaHostGetDevicePointer(&gpu_mem.dev_mem, gpu_mem.host_mem, 0));
         gpu_mmap[name] = gpu_mem;
         return EXIT_SUCCESS;
@@ -122,10 +122,10 @@ public:
             return EXIT_FAILURE;
         }
         memcpy(gpu_mem.host_mem, src_data, size_in_bytes);
-//        MY_CUDA_SAFE_CALL(cudaHostGetDevicePointer(&gpu_mem.dev_mem, gpu_mem.host_mem, 0));
+        //        MY_CUDA_SAFE_CALL(cudaHostGetDevicePointer(&gpu_mem.dev_mem, gpu_mem.host_mem, 0));
         return EXIT_SUCCESS;
     }
-    
+
     int copyFromZero(std::string name, void* dst_data, size_t size_in_bytes) {
         mmap_iterator it = gpu_mmap.find(name);
         if (it == gpu_mmap.end()) {
@@ -147,7 +147,7 @@ public:
         } else if (size_in_bytes < gpu_mem.size) {
             std::cout << "copyFromZero::Warning. The destination address memory size is smaller than the device source size." << std::endl;
         }
-//        dst_data = gpu_mem.host_mem;
+        //        dst_data = gpu_mem.host_mem;
         memcpy(dst_data, gpu_mem.host_mem, size_in_bytes);
         return EXIT_SUCCESS;
     }
@@ -397,7 +397,7 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
 #if ZEROCOPY
     // We will want ZEROCOPY code for Xavier and newer architecture platforms
     // https://developer.ridgerun.com/wiki/index.php?title=NVIDIA_CUDA_Memory_Management
-    if (!cuda_res.props.canMapHostMemory) 
+    if (!cuda_res.props.canMapHostMemory)
         exit(0);
     MY_CUDA_SAFE_CALL(cudaSetDeviceFlags(cudaDeviceMapHost));
 
@@ -411,19 +411,19 @@ int initialize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
             sar_data.Ant_z.data.size() * sizeof (sar_data.Ant_z.data[0]));
     cuda_res.copyToDevice("slant_range", (void *) &sar_data.slant_range.data[0],
             sar_data.slant_range.data.size() * sizeof (sar_data.slant_range.data[0]));
-            
-/* Update sampleData to be 2^N compatible */
-    int newSize = pow(2,ceil(log(sar_data.sampleData.data.size())/log(2)));
-    cufftComplex * temp = (cufftComplex*)malloc(newSize*sizeof(sar_data.sampleData.data[0]));
-    memcpy(temp,&sar_data.sampleData.data[0],sar_data.sampleData.data.size() * sizeof (sar_data.sampleData.data[0]));
+
+    /* Update sampleData to be 2^N compatible */
+    int newSize = pow(2, ceil(log(sar_data.sampleData.data.size()) / log(2)));
+    cufftComplex * temp = (cufftComplex*) malloc(newSize * sizeof (sar_data.sampleData.data[0]));
+    memcpy(temp, &sar_data.sampleData.data[0], sar_data.sampleData.data.size() * sizeof (sar_data.sampleData.data[0]));
     //sar_data.sampleData.data = temp;
 
-//    cuda_res.copyToDevice("sampleData", (void *) &sar_data.sampleData.data[0],
-//            sar_data.sampleData.data.size() * sizeof (sar_data.sampleData.data[0]));
+    //    cuda_res.copyToDevice("sampleData", (void *) &sar_data.sampleData.data[0],
+    //            sar_data.sampleData.data.size() * sizeof (sar_data.sampleData.data[0]));
     cuda_res.copyToDevice("sampleData", (void *) temp,
             newSize * sizeof (sar_data.sampleData.data[0]));
     free(temp);
-    
+
     cuda_res.copyToDevice("startF", (void *) &sar_data.startF.data[0],
             sar_data.startF.data.size() * sizeof (sar_data.startF.data[0]));
     cuda_res.copyToDevice("sar_image_params", (void *) &sar_img_params,
@@ -449,16 +449,16 @@ int finalize_CUDAResources(const SAR_Aperture<__nTp1>& sar_data,
     }
 
 #if ZEROCOPY
-/*
-    cuda_res.freeHostMemory("output_image");
-    cuda_res.freeHostMemory("sar_image_params");
-    cuda_res.freeHostMemory("Ant_x");
-    cuda_res.freeHostMemory("Ant_y");
-    cuda_res.freeHostMemory("Ant_z");
-    cuda_res.freeHostMemory("slant_range");
-    cuda_res.freeHostMemory("startF");
-    cuda_res.freeHostMemory("sampleData");
-*/
+    /*
+        cuda_res.freeHostMemory("output_image");
+        cuda_res.freeHostMemory("sar_image_params");
+        cuda_res.freeHostMemory("Ant_x");
+        cuda_res.freeHostMemory("Ant_y");
+        cuda_res.freeHostMemory("Ant_z");
+        cuda_res.freeHostMemory("slant_range");
+        cuda_res.freeHostMemory("startF");
+        cuda_res.freeHostMemory("sampleData");
+     */
 #else
     cuda_res.freeGPUMemory("output_image");
 #endif
@@ -504,7 +504,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             << sar_image_params.max_Wx_m << " m cross-range" << std::endl;
     std::cout << "Maximum Resolution:  " << std::fixed << std::setprecision(2) << sar_image_params.slant_rangeResolution << "m range, "
             << sar_image_params.azimuthResolution << " m cross-range" << std::endl;
-    GPUMemoryManager cuda_res;    
+    GPUMemoryManager cuda_res;
 
     if (initialize_GPUMATLAB(cuda_res.deviceId) == EXIT_FAILURE) {
         std::cout << "cuda_focus_SAR_image::Could not initialize the GPU. Exiting..." << std::endl;
@@ -551,7 +551,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     std::cout << cuda_res << std::endl;
     int numSamples = sar_data.sampleData.data.size();
-    int newSize = pow(2,ceil(log(sar_data.sampleData.data.size())/log(2)));
+    int newSize = pow(2, ceil(log(sar_data.sampleData.data.size()) / log(2)));
 
     clock_t c0, c1, c2;
 
@@ -573,16 +573,16 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     dim3 dimGrid(std::ceil((float) sar_image_params.N_x_pix / cuda_res.blockwidth),
             std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
     c0 = clock();
-    
+
 #if ZEROCOPY
-/*
-    backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
-            sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
-            delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
-            c__4_delta_freq, cuda_res.getDeviceMemPointer<float>("startF"),
-            left, bottom, cuda_res.getDeviceMemPointer<float4>("platform_positions"), 0, 0,
-            cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
-*/
+    /*
+        backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
+                sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
+                delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
+                c__4_delta_freq, cuda_res.getDeviceMemPointer<float>("startF"),
+                left, bottom, cuda_res.getDeviceMemPointer<float4>("platform_positions"), 0, 0,
+                cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
+     */
     backprojection_loop<__nTp> << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
             sar_data.numRangeSamples, sar_data.numAzimuthSamples,
             delta_x_m_per_pix, delta_y_m_per_pix,
@@ -645,10 +645,10 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     //    for (int i = 0; i < 10; i++) {
     //        std::cout << "fftshift(ifft(sampleData))[" << i << "]=" << std::setprecision(7) << devResult1[i]/sar_image_params.N_fft << std::endl;
     //    }
-   
+
 #endif
     cuda_res.freeGPUMemory("range_vec");
- 
+
 
     if (finalize_CUDAResources(sar_data, sar_image_params, cuda_res) == EXIT_FAILURE) {
         std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..." << std::endl;

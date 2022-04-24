@@ -23,13 +23,13 @@
 #include <iostream>
 #include <iterator>
 #include <cmath>
-#include <memory>
 #include <numeric>
 #include <string>
 #include <valarray>
 #include <vector>
 
 #include "uncc_complex.hpp"
+#include "uncc_simplematrix.hpp"
 
 #define CLIGHT 299792458.0 /* c: speed of light, m/s */
 //#define CLIGHT 299792458.0f /* c: speed of light, m/s */
@@ -44,229 +44,6 @@ using Complex = unccComplex<__nTp>;
 
 template<typename __nTp>
 using CArray = std::valarray<Complex<__nTp> >;
-
-class Range {
-public:
-    int start, end, stride;
-
-    Range(int _end) : Range(0, _end, 1) {
-    }
-
-    Range(int _start, int _end) : Range(_start, _end, 1) {
-    }
-
-    Range(int _start, int _end, int _stride) : start(_start), end(_end), stride(_stride) {
-        if (start < 0) {
-            std::cout << "Error on  Range construction. Start < 0." << std::endl;
-            start = 0;
-        }
-        if (end < 0) {
-            std::cout << "Error on  Range construction. End < 0." << std::endl;
-            end = 0;
-        }
-        if (stride == 0) {
-            std::cout << "Error on  Range construction. Stride = 0." << std::endl;
-            stride = (start < end) ? 1 : -1;
-        }
-        if (start > end && stride > 0) {
-            std::cout << "Error on  Range construction. Stride has incorrect sign." << std::endl;
-            stride = -1;
-        } else if (start < end && stride < 0) {
-            std::cout << "Error on  Range construction. Stride has incorrect sign." << std::endl;
-            stride = 1;
-        }
-        int nelem = (end - start) / stride;
-        if (nelem == 0) {
-            std::cout << "Error on  Range construction. Number of elements in range is 0." << std::endl;
-        }
-    }
-
-    std::vector<int> values() {
-        std::vector<int> values;
-        int nelem = (end - start) / stride;
-        for (int elemIdx = 0; elemIdx < nelem; elemIdx++) {
-            values.push_back(start + elemIdx * stride);
-        }
-        return values;
-    }
-
-    virtual ~Range() {
-    }
-};
-
-template<typename __numTp>
-struct SimpleMatrix {
-public:
-    std::vector<int> shape;
-    std::vector<__numTp> data;
-    typedef std::shared_ptr<SimpleMatrix> Ptr;
-
-    int nelem() {
-        return (shape.size() == 0) ? 0 :
-                std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<int>()); // / (polarityIdx == -1 ? 1 : shape[polarityIdx]);
-    }
-
-    bool isEmpty() {
-        return shape.size() == 0;
-    }
-
-    int sub2ind(std::vector<int> ivec) {
-        return sub2ind(ivec, ivec.size() - 1);
-    }
-
-    __numTp at(std::vector<int> idxs) {
-        return data[sub2ind(idxs)];
-    }
-
-private:
-    // Range-based restructuring of SAR aperture data uses recursive 
-    // functions for multi-dimensional data indexing. This is slow. I have
-    // unrolled some functions for common invocations to replace purely 
-    // recursive functions (similar to what would happen 
-    // via #pragma inline_recursion(on) for a MSVC compiler).
-    // https://docs.microsoft.com/en-us/cpp/preprocessor/inline-recursion?view=msvc-160
-    //
-    // Ultimately a better and more intelligent way to perform range-based
-    // restructuring of memory is required. This will have to do in the interim.
-    //
-    inline
-    int nelem(int dim) {
-        return (shape.size() == 0) ? 0 :
-                std::accumulate(std::begin(shape), std::begin(shape) + dim + 1, 1, std::multiplies<int>());
-    }
-
-    int nelem_slow(int dim) {
-        return (dim == 0) ? shape[0] : shape[dim] * nelem(dim - 1);
-    }
-    
-    inline
-    int sub2ind(std::vector<int> ivec, int idx) {
-        int retval = 0;
-        if (retval > 5) {
-            return sub2ind_slow(ivec, idx);
-        }
-        switch (idx) {
-            case 5:
-                retval += ivec[5];
-                retval *= shape[4];
-            case 4:
-                retval += ivec[4];
-                retval *= shape[3];
-            case 3:
-                retval += ivec[3];
-                retval *= shape[2];
-            case 2:
-                retval += ivec[2];
-                retval *= shape[1];
-            case 1:
-                retval += ivec[1];
-                retval *= shape[0];
-            case 0:
-                retval += ivec[0];
-        }
-        return retval;
-    }
-
-    int sub2ind_slow(std::vector<int> ivec, int idx) {
-        if (idx == 0)
-            return ivec[0];
-        else
-            return ivec[idx] * nelem(idx - 1) + sub2ind(ivec, idx - 1);
-    }
-
-    void iterate(std::vector<std::vector<int>> dimIdxs, std::vector<int>& cpos, int dim, std::vector<__numTp>& out) {
-        std::vector<int>::const_iterator itr;
-        for (itr = dimIdxs[dim].begin(); itr != dimIdxs[dim].end(); ++itr) {
-            // do stuff  breadth-first
-            cpos[dim] = *itr;
-            if (dim > 0) {
-                iterate(dimIdxs, cpos, dim - 1, out);
-            }
-            if (dim == 0) {
-                out.push_back(this->at(cpos));
-                //std::cout << ".at( ";
-                //for (std::vector<int>::const_iterator i = cpos.begin(); i != cpos.end(); ++i) {
-                //    std::cout << *i << ", ";
-                //}
-                //std::cout << " )" << std::endl;
-            }
-            // do stuff  depth-first
-        }
-    }
-
-public:
-    // converts the matrix to a vector using column-major order
-
-    template <typename __dstTp>
-    std::vector<__dstTp> toVector() {
-        int numElems = nelem();
-        std::vector<__dstTp> vecdata(numElems);
-        for (int idx = 0; idx < numElems; idx++) {
-            vecdata.push_back((__dstTp) data[idx]);
-        }
-    }
-    
-    std::vector<__numTp> toVector() {
-        int numElems = nelem();
-        std::vector<__numTp> vecdata(numElems);
-        for (int idx = 0; idx < numElems; idx++) {
-            vecdata.push_back(data[idx]);
-        }
-    }    
-    
-    std::vector<__numTp> getData(std::vector<std::vector<int>> idxs) {
-        std::vector<__numTp> data;
-        std::vector<int> b(idxs.size(), 0);
-        iterate(idxs, b, idxs.size() - 1, data);
-        return data;
-    }
-
-    SimpleMatrix getRange(std::vector<Range> rangeSelection) {
-        SimpleMatrix<__numTp> output;
-        std::vector<std::vector<int>> idxs;
-        for (Range r : rangeSelection) {
-            std::vector<int> range_indices = r.values();
-            if (range_indices.size() > 1) {
-                output.shape.push_back(range_indices.size());
-            }
-            idxs.push_back(r.values());
-        }
-        output.data = getData(idxs);
-        return output;
-    }
-
-    // TODO: Add zero-padding code for the SimpleMatrix class
-    void pad(std::vector<int> padding, __numTp value) {
-
-    }
-
-    SimpleMatrix::Ptr create() {
-        return std::make_shared<SimpleMatrix>();
-    }
-
-    template <typename _Tp>
-    friend std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp> &c);
-
-};
-
-template <typename __numTp>
-inline std::ostream& operator<<(std::ostream& output, const SimpleMatrix<__numTp>& sMat) {
-    int MAX_NUM_VARS_PRINTED = 10;
-    std::string dimsStr;
-    if (!sMat.shape.empty()) {
-        dimsStr = std::accumulate(sMat.shape.begin() + 1, sMat.shape.end(),
-                std::to_string(sMat.shape[0]), [](const std::string & a, int b) {
-                    return a + ',' + std::to_string(b);
-                });
-    }
-    output << "[" << dimsStr << "] = {"; \
-    typename std::vector<__numTp>::const_iterator i;
-    for (i = sMat.data.begin(); i != sMat.data.end() && i != sMat.data.begin() + MAX_NUM_VARS_PRINTED; ++i) {
-        output << *i << ", ";
-    }
-    output << ((sMat.data.size() > MAX_NUM_VARS_PRINTED) ? " ..." : "") << " }";
-    return output;
-}
 
 // For back projection algorithm 
 
@@ -289,8 +66,6 @@ public:
 
     // GOTCHA + Sandia Fields
     SimpleMatrix<Complex<_numTp>> sampleData;
-    //int numPulses;
-    //int numRangeSamples;
     SimpleMatrix<_numTp> Ant_x;
     SimpleMatrix<_numTp> Ant_y;
     SimpleMatrix<_numTp> Ant_z;
@@ -364,7 +139,7 @@ public:
             Range(0, numAzimuthSamples, 1),
             Range(polarity_channel, polarity_channel + 1, 1)};
         dstData.sampleData = sampleData.getRange(samplePolaritySelection);
-
+        
         std::vector<Range> azimuthPolaritySelection = {Range(0, 1, 1),
             Range(0, numAzimuthSamples, 1),
             Range(polarity_channel, polarity_channel + 1, 1)};
@@ -373,6 +148,7 @@ public:
         dstData.Ant_y = Ant_y.getRange(azimuthPolaritySelection);
         dstData.Ant_z = Ant_z.getRange(azimuthPolaritySelection);
         dstData.startF = startF.getRange(azimuthPolaritySelection);
+        dstData.chirpRate = chirpRate.getRange(azimuthPolaritySelection);
         dstData.bandwidth = bandwidth;
         dstData.freq = freq;
         dstData.slant_range = slant_range;
@@ -426,10 +202,11 @@ inline std::ostream& operator<<(std::ostream& output, const SAR_Aperture<_numTp>
 #define numValuesPerPolarity(sMat, pDim) sMat.nelem()/((sMat.shape.size() >= pDim && pDim != -1) ? sMat.shape[pDim] : 1)
 
 // TODO: Make this a class function for SAR_Aperture
+
 template<typename _numTp>
 int resize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture, int newNumRangeSamples) {
     // resize this in the freq rows=freq/range cols=pulses/azimuth
-    SimpleMatrix<Complex<_numTp>> sampleData;
+    SimpleMatrix<Complex < _numTp>> sampleData;
     // GOTCHA-Only Fields
     SimpleMatrix<_numTp> freq; // vector content changes 0....maxF in Nfft steps
 
@@ -438,7 +215,7 @@ int resize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture, int newNumRangeSamp
     SimpleMatrix<_numTp> deltaF; // smaller --> vector content changes 0....maxF in Nfft steps
 
     _numTp mean_deltaF; // changes
-    
+    return EXIT_SUCCESS;
 }
 
 template<typename _numTp>
@@ -457,7 +234,7 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
         std::cout << "initializeSARFocusingVariables::Not enough antenna positions available to focus the selected SAR data." << std::endl;
         return EXIT_FAILURE;
     }
-        
+
     // populate frequency sample locations for every pulse if not already available
     // also populates startF and deltaF in some cases
     if (numValuesPerPolarity(aperture.freq, polDim) != numSARSamples) {
@@ -498,9 +275,11 @@ int initialize_SAR_Aperture_Data(SAR_Aperture<_numTp>& aperture) {
                     aperture.deltaF.data.push_back(deltaF);
                 }
             }
-        } else if (!aperture.startF.isEmpty() && aperture.startF.shape[1] == aperture.numAzimuthSamples &&
-                !aperture.ADF.isEmpty() && aperture.ADF.shape[0] == 1 &&
-                !aperture.chirpRate.isEmpty() && aperture.chirpRate.shape[1] == aperture.numAzimuthSamples) {
+        } else if (!aperture.startF.isEmpty() && 
+                (aperture.startF.shape[0] == aperture.numAzimuthSamples || aperture.startF.shape[1] == aperture.numAzimuthSamples) &&
+                !aperture.ADF.isEmpty() && aperture.ADF.nelem() == 1 &&
+                !aperture.chirpRate.isEmpty() && 
+                (aperture.chirpRate.shape[0] == aperture.numAzimuthSamples || aperture.chirpRate.shape[1] == aperture.numAzimuthSamples)) {
             std::cout << "Assuming variable frequency samples for each SAR pulse. Interpolating frequency samples from chirp rate, sample rate and start frequency." << std::endl;
             aperture.deltaF.shape.clear();
             aperture.deltaF.data.clear();
@@ -683,7 +462,7 @@ public:
 
         return image_params;
     }
-    
+
     CUDAFUNCTION ~SAR_ImageFormationParameters() {
     };
 

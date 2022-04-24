@@ -21,8 +21,9 @@
 #include <stdio.h>  /* printf */
 #include <time.h>
 
-#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
-#include "../../cpuBackProjection/cpuBackProjection_main.hpp"
+#include <uncc_sar_focusing.hpp>
+#include <uncc_sar_globals.hpp>
+#include <uncc_sar_matio.hpp>
 
 #include "cuda_sar_focusing.hpp"
 

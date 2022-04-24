@@ -21,7 +21,7 @@
 
 #include <cuda_runtime.h>
 
-#include "../../cpuBackProjection/uncc_sar_focusing.hpp"
+#include <uncc_sar_focusing.hpp>
 
 #define CAREFUL_AMINUSB_SQ(x,y) __fmul_rn(__fadd_rn((x), -1.0f*(y)), __fadd_rn((x), -1.0f*(y)))
 

@@ -17,7 +17,8 @@
 #ifndef CPUBACKPROJECTION_HPP
 #define CPUBACKPROJECTION_HPP
 
-#include "uncc_sar_focusing.hpp"
+#include <uncc_sar_focusing.hpp>
+
 #include "cpuBackProjection_fft.hpp"
 
 template <typename __nTp>

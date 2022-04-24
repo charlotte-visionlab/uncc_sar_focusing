@@ -21,7 +21,7 @@
 #include <mex.h>    // Matlab library includes
 #include <matrix.h> // Matlab mxComplexSingle struct
 
-#include "uncc_sar_focusing.hpp"
+#include <uncc_sar_focusing.hpp>
 
 #define ARG_FREQ 1
 #define ARG_ANT_X 2
