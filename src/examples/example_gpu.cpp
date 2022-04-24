@@ -29,7 +29,7 @@
 #define CUDAFUNCTION
 
 #include "charlotte_sar_api.hpp"
-#include "example_gpu.hpp"
+//#include "example_gpu.hpp"
 
 #include <uncc_sar_globals.hpp>
 //#include "../gpuBackProjection/cuda_sar_focusing/cuda_sar_focusing.hpp"
