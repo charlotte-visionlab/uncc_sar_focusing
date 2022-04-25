@@ -31,7 +31,7 @@
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
-using ComplexArrayType = CArray<NumericType>;
+//using ComplexArrayType = CArray<NumericType>;
 
 int readData(const std::string& inputfile, const std::string& polarity, PhaseHistory<float>& ph) {
 

@@ -45,6 +45,9 @@ using Complex = unccComplex<__nTp>;
 template<typename __nTp>
 using CArray = std::valarray<Complex<__nTp> >;
 
+//template<typename __nTp>
+//using CArray = std::vector<Complex<__nTp> >;
+
 // For back projection algorithm 
 
 template <typename __Tp>
