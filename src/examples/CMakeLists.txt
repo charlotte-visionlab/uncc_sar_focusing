@@ -9,8 +9,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -no-pie -DMATLAB_MEX_FILE -g -O0")
 if (FFTW_FOUND)
     include_directories(
         ../include
-    #    ${FFTW_INCLUDE_DIRS}
-    #    ${MATIO_INCLUDE_DIRS}
     )
 
     add_executable(example_cpu
@@ -20,19 +18,9 @@ if (FFTW_FOUND)
 endif (FFTW_FOUND)
 
 if (CUDA_FOUND)
-
-    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-        set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_DEFAULT_CUDA_ARCHITECTURES})
-    endif()
-
     include_directories(
         ../include
-        ${CUDA_INCLUDE_DIRS}
-        ${CUDA_TOOLKIT_ROOT_DIR}/samples/common/inc
-        ${CUDA_TOOLKIT_ROOT_DIR}/targets/x86_64-linux/include/
     )
-
-    set(CUDA_NVCC_FLAGS -Xcompiler -no-pie -fPIC ${CUDA_ARCH_FLAGS} --ptxas-options=-v -DMATLAB_MEX_FILE -G -g -O0)
 
     add_executable(example_gpu
         example_gpu.cpp)
