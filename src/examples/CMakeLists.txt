@@ -15,7 +15,7 @@ if (FFTW_FOUND)
 
     add_executable(example_cpu
         example_cpu.cpp)
-    target_link_libraries(example_cpu matio lib_uncc_sar_focusing_cpu ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
+    target_link_libraries(example_cpu lib_uncc_sar_focusing_cpu matio ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB})
 
 endif (FFTW_FOUND)
 
@@ -36,7 +36,7 @@ if (CUDA_FOUND)
 
     add_executable(example_gpu
         example_gpu.cpp)
-    target_link_libraries(example_gpu -no-pie matio lib_uncc_sar_focusing_gpu ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES} matio)
+    target_link_libraries(example_gpu -no-pie lib_uncc_sar_focusing_gpu matio ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
 
 endif (CUDA_FOUND)
 
