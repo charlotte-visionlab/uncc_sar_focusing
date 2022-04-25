@@ -25,18 +25,11 @@
 #include <cxxopts.hpp>
 
 // this declaration needs to be in any C++ compiled target for CPU
-//#define CUDAFUNCTION __host__ __device__
 #define CUDAFUNCTION
 
 #include "charlotte_sar_api.hpp"
-//#include "example_gpu.hpp"
 
 #include <uncc_sar_globals.hpp>
-//#include "../gpuBackProjection/cuda_sar_focusing/cuda_sar_focusing.hpp"
-
-//using NumericType = float;
-//using ComplexType = Complex<NumericType>;
-//using ComplexArrayType = CArray<NumericType>;
 
 int main(int argc, char **argv) {
     cxxopts::Options options("example_gpu", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");

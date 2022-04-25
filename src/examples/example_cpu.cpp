@@ -23,7 +23,6 @@
 #define CUDAFUNCTION
 
 #include "charlotte_sar_api.hpp"
-//#include "example_cpu.hpp"
 
 #include <uncc_sar_globals.hpp>
 
