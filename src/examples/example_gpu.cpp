@@ -16,9 +16,6 @@
  */
 
 // Standard Library includes
-#include <stdio.h>  /* printf */
-#include <time.h>
-
 #include <iomanip>
 #include <sstream>
 
@@ -27,7 +24,7 @@
 // this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION
 
-#include "charlotte_sar_api.hpp"
+#include <charlotte_sar_api.hpp>
 
 #include <uncc_sar_globals.hpp>
 

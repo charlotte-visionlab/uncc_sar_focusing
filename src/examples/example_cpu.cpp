@@ -15,14 +15,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Standard Library includes
 #include <iomanip>
 #include <sstream>
 
 #include <cxxopts.hpp>
 
+// this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION
 
-#include "charlotte_sar_api.hpp"
+#include <charlotte_sar_api.hpp>
 
 #include <uncc_sar_globals.hpp>
 

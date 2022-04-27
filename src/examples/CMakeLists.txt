@@ -24,7 +24,7 @@ if (CUDA_FOUND)
 
     add_executable(example_gpu
         example_gpu.cpp)
-    target_link_libraries(example_gpu -no-pie lib_uncc_sar_focusing_gpu matio ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
+    target_link_libraries(example_gpu lib_uncc_sar_focusing_gpu matio ${CUDA_LIBRARIES} ${CUDA_CUFFT_LIBRARIES})
 
 endif (CUDA_FOUND)
 
