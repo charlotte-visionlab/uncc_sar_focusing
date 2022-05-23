@@ -14,13 +14,11 @@ include_directories(
 
 add_executable(uncc_sar_focusing_cpu
     cpuBackProjection_main.cpp
-    cpuBackProjection_fft.cpp
     ../core/uncc_sar_matio.cpp)
 target_link_libraries(uncc_sar_focusing_cpu ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
 #set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
 add_library(lib_uncc_sar_focusing_cpu SHARED 
-    cpuBackProjection_fft.cpp 
     ../core/uncc_sar_matio.cpp
     ../core/charlotte_sar_api.cpp)
 
@@ -32,7 +30,6 @@ if (Matlab_FOUND)
     )
     add_library(${PROJECT_NAME} SHARED 
         cpuBackProjection_mex.cpp
-        cpuBackProjection_fft.cpp
         ${MATLAB_PROJECT_DIR}/Matlabdef.def)
     target_link_libraries(${PROJECT_NAME} ${MATLAB_LIBRARIES} ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB})
 

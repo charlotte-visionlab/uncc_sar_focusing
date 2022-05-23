@@ -25,8 +25,8 @@
 #define CUDAFUNCTION
 
 #include <charlotte_sar_api.hpp>
-
 #include <uncc_sar_globals.hpp>
+#include "../cpuBackProjection/cpuBackProjection.hpp"
 
 int main(int argc, char **argv) {
 

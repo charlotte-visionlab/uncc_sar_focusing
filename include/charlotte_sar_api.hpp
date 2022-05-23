@@ -105,19 +105,11 @@ int sar_data_callback(
     return EXIT_SUCCESS;
 }
 
-#include "../src/cpuBackProjection/cpuBackProjection.hpp"
+#include <uncc_sar_focusing.hpp>
 
 using NumericType = float;
 using ComplexType = Complex<NumericType>;
 using ComplexArrayType = CArray<NumericType>;
-
-template void focus_SAR_image(const SAR_Aperture<float>& SARData,
-        const SAR_ImageFormationParameters<float>& SARImgParams,
-        CArray<float>& output_image);
-
-template void focus_SAR_image(const SAR_Aperture<double>& SARData,
-        const SAR_ImageFormationParameters<double>& SARImgParams,
-        CArray<double>& output_image);
 
 template<typename __nTp, typename __pTp>
 int writeBMPFile(const SAR_ImageFormationParameters<__pTp>& SARImgParams,

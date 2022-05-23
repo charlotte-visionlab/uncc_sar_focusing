@@ -25,7 +25,6 @@
 #define CUDAFUNCTION
 
 #include <charlotte_sar_api.hpp>
-
 #include <uncc_sar_globals.hpp>
 
 int main(int argc, char **argv) {
@@ -47,7 +46,7 @@ int main(int argc, char **argv) {
         std::stringstream ss;
 
         // Sandia SAR DATA FILE LOADING
-        int file_idx = 9; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
+        int file_idx = 1; // 1-10 for Sandia Rio Grande, 1-9 for Sandia Farms
         std::string fileprefix = Sandia_RioGrande_fileprefix;
         std::string filepostfix = Sandia_RioGrande_filepostfix;
         //        std::string fileprefix = Sandia_Farms_fileprefix;
