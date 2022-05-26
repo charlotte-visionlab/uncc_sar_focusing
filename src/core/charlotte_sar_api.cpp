@@ -91,13 +91,6 @@ int readData(const std::string& inputfile, const int MAX_PULSES, const std::stri
     
     std::cout << "SAR focusing data = " << SAR_focusing_data << std::endl;
     // Allocate memory for data to pass to library function call
-    //    NumericType sph_MATData_preamble_ADF;
-    //    std::vector<NumericType> sph_MATData_Data_SampleData(2 * SAR_focusing_data.numRangeSamples * SAR_focusing_data.numAzimuthSamples);
-    //    std::vector<NumericType> sph_MATData_Data_StartF(SAR_focusing_data.numAzimuthSamples);
-    //    std::vector<NumericType> sph_MATData_Data_ChirpRate(SAR_focusing_data.numAzimuthSamples);
-    //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_x(SAR_focusing_data.numAzimuthSamples);
-    //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_y(SAR_focusing_data.numAzimuthSamples);
-    //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_z(SAR_focusing_data.numAzimuthSamples);
     ph.sph_MATData_Data_SampleData.resize(2 * SAR_focusing_data.numRangeSamples * numPulses);
     ph.sph_MATData_Data_StartF.resize(numPulses);
     ph.sph_MATData_Data_ChirpRate.resize(numPulses);
@@ -131,7 +124,7 @@ int readData(const std::string& inputfile, const int MAX_PULSES, const std::stri
     std::vector<NumericType> vec_radarCoordinateFrame_x = SAR_focusing_data.Ant_x.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_y = SAR_focusing_data.Ant_y.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_z = SAR_focusing_data.Ant_z.toVector<NumericType>();
-    //for (int i = 0; i < SAR_aperture_data.numAzimuthSamples; i++) {
+
     int pulseTgtIndex = 0;
     for (std::vector<int>::iterator pIter = pulseIndices.begin(); pIter != pulseIndices.end(); ++pIter) {
         int pulseSrcIndex = *pIter;

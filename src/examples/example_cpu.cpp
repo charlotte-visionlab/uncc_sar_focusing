@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     PhaseHistory<float> ph;
     ph.id = 0;
 
-    int MAX_PULSES = 500;
+    int MAX_PULSES = 200;
     readData(inputfile, MAX_PULSES, polarity, ph);
 
     //focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
