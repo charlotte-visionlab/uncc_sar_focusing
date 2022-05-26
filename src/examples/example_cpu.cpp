@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
         inputfile = fileprefix + ss.str() + filepostfix + ".mat";
     }
-    
+
     // Sandia SAR data is multi-channel having up to 4 polarities
     // 1 = HH, 2 = HV, 3 = VH, 4 = VVbandwidth = 0:freq_per_sample:(numRangeSamples-1)*freq_per_sample;
     std::string polarity = result["polarity"].as<std::string>();
@@ -71,11 +71,14 @@ int main(int argc, char **argv) {
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
     PhaseHistory<float> ph;
+    ph.id = 0;
 
-    readData(inputfile, polarity, ph);
+    int MAX_PULSES = 500;
+    readData(inputfile, MAX_PULSES, polarity, ph);
 
     //focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
     sph_sar_data_callback_cpu<float>(
+            ph.id,
             ph.sph_MATData_preamble_ADF,
             ph.sph_MATData_Data_SampleData.data(),
             ph.numRangeSamples,

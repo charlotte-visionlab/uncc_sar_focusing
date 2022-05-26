@@ -33,7 +33,7 @@ using NumericType = float;
 using ComplexType = Complex<NumericType>;
 //using ComplexArrayType = CArray<NumericType>;
 
-int readData(const std::string& inputfile, const std::string& polarity, PhaseHistory<float>& ph) {
+int readData(const std::string& inputfile, const int MAX_PULSES, const std::string& polarity, PhaseHistory<float>& ph) {
 
     std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
 
@@ -81,7 +81,15 @@ int readData(const std::string& inputfile, const std::string& polarity, PhaseHis
         SAR_focusing_data = SAR_aperture_data;
     }
 
-    std::cout << "SAR focusing data = "  << SAR_focusing_data << std::endl;
+    int numPulses = (MAX_PULSES > SAR_focusing_data.numAzimuthSamples) ? SAR_focusing_data.numAzimuthSamples : MAX_PULSES;
+    int firstPulseIndex = (SAR_focusing_data.numAzimuthSamples - numPulses) / 2;
+    int lastPulseIndex = (SAR_focusing_data.numAzimuthSamples + numPulses - 1) / 2 + ((SAR_focusing_data.numAzimuthSamples + numPulses) % 2);
+    std::vector<int> pulseIndices(numPulses);
+    for (std::vector<int>::iterator pIter = pulseIndices.begin(); pIter != pulseIndices.end(); ++pIter) {
+        *pIter = firstPulseIndex++;
+    }
+    
+    std::cout << "SAR focusing data = " << SAR_focusing_data << std::endl;
     // Allocate memory for data to pass to library function call
     //    NumericType sph_MATData_preamble_ADF;
     //    std::vector<NumericType> sph_MATData_Data_SampleData(2 * SAR_focusing_data.numRangeSamples * SAR_focusing_data.numAzimuthSamples);
@@ -90,12 +98,12 @@ int readData(const std::string& inputfile, const std::string& polarity, PhaseHis
     //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_x(SAR_focusing_data.numAzimuthSamples);
     //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_y(SAR_focusing_data.numAzimuthSamples);
     //    std::vector<NumericType> sph_MATData_Data_radarCoordinateFrame_z(SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_SampleData.resize(2 * SAR_focusing_data.numRangeSamples * SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_StartF.resize(SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_ChirpRate.resize(SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_radarCoordinateFrame_x.resize(SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_radarCoordinateFrame_y.resize(SAR_focusing_data.numAzimuthSamples);
-    ph.sph_MATData_Data_radarCoordinateFrame_z.resize(SAR_focusing_data.numAzimuthSamples);
+    ph.sph_MATData_Data_SampleData.resize(2 * SAR_focusing_data.numRangeSamples * numPulses);
+    ph.sph_MATData_Data_StartF.resize(numPulses);
+    ph.sph_MATData_Data_ChirpRate.resize(numPulses);
+    ph.sph_MATData_Data_radarCoordinateFrame_x.resize(numPulses);
+    ph.sph_MATData_Data_radarCoordinateFrame_y.resize(numPulses);
+    ph.sph_MATData_Data_radarCoordinateFrame_z.resize(numPulses);
 
     //std::vector<std::vector<int>> adf_index {{0}};
     //sph_MATData_preamble_ADF = (NumericType) SAR_aperture_data.ADF.getData(adf_index).at(0);
@@ -104,27 +112,37 @@ int readData(const std::string& inputfile, const std::string& polarity, PhaseHis
 
     std::vector<ComplexType> vec_SampleData = SAR_focusing_data.sampleData.toVector<ComplexType>();
 
-    int cmplx_index = 0;
-    for (std::vector<ComplexType>::iterator cmplx_val = vec_SampleData.begin(); cmplx_val != vec_SampleData.end(); cmplx_val++) {
-        //std::cout << *cmplx_val << std::endl;
-        ph.sph_MATData_Data_SampleData[cmplx_index * 2 + 0] = cmplx_val->_M_real;
-        ph.sph_MATData_Data_SampleData[cmplx_index * 2 + 1] = cmplx_val->_M_imag;
-        cmplx_index++;
+    int pulseTgtOffset = 0;
+    for (std::vector<int>::iterator pIter = pulseIndices.begin(); pIter != pulseIndices.end(); ++pIter) {
+        //int pulseTgtIndex = 0;
+        int pulseSrcIndex = *pIter;
+        int pulseSrcOffset = pulseSrcIndex * SAR_focusing_data.numRangeSamples;
+        for (int frequencyIndex = 0; frequencyIndex < SAR_focusing_data.numRangeSamples; frequencyIndex++) {
+            //std::cout << *cmplx_val << std::endl;
+            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 0] = vec_SampleData[pulseSrcOffset + frequencyIndex]._M_real;
+            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 1] = vec_SampleData[pulseSrcOffset + frequencyIndex]._M_imag;
+            //pulseTgtIndex++;
+        }
+        pulseTgtOffset += SAR_focusing_data.numRangeSamples * 2;
     }
-
+    
     std::vector<NumericType> vec_StartF = SAR_focusing_data.startF.toVector<NumericType>();
     std::vector<NumericType> vec_ChirpRate = SAR_focusing_data.chirpRate.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_x = SAR_focusing_data.Ant_x.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_y = SAR_focusing_data.Ant_y.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_z = SAR_focusing_data.Ant_z.toVector<NumericType>();
-    for (int i = 0; i < SAR_aperture_data.numAzimuthSamples; i++) {
-        ph.sph_MATData_Data_StartF[i] = vec_StartF[i];
-        ph.sph_MATData_Data_ChirpRate[i] = vec_ChirpRate[i];
-        ph.sph_MATData_Data_radarCoordinateFrame_x[i] = vec_radarCoordinateFrame_x[i];
-        ph.sph_MATData_Data_radarCoordinateFrame_y[i] = vec_radarCoordinateFrame_y[i];
-        ph.sph_MATData_Data_radarCoordinateFrame_z[i] = vec_radarCoordinateFrame_z[i];
+    //for (int i = 0; i < SAR_aperture_data.numAzimuthSamples; i++) {
+    int pulseTgtIndex = 0;
+    for (std::vector<int>::iterator pIter = pulseIndices.begin(); pIter != pulseIndices.end(); ++pIter) {
+        int pulseSrcIndex = *pIter;
+        ph.sph_MATData_Data_StartF[pulseTgtIndex] = vec_StartF[pulseSrcIndex];
+        ph.sph_MATData_Data_ChirpRate[pulseTgtIndex] = vec_ChirpRate[pulseSrcIndex];
+        ph.sph_MATData_Data_radarCoordinateFrame_x[pulseTgtIndex] = vec_radarCoordinateFrame_x[pulseSrcIndex];
+        ph.sph_MATData_Data_radarCoordinateFrame_y[pulseTgtIndex] = vec_radarCoordinateFrame_y[pulseSrcIndex];
+        ph.sph_MATData_Data_radarCoordinateFrame_z[pulseTgtIndex] = vec_radarCoordinateFrame_z[pulseSrcIndex];
+        pulseTgtIndex++;
     }
     ph.numRangeSamples = SAR_focusing_data.numRangeSamples;
-    ph.numAzimuthSamples = SAR_focusing_data.numAzimuthSamples;
+    ph.numAzimuthSamples = numPulses;
     return EXIT_SUCCESS;
 }

@@ -31,6 +31,7 @@
 template<typename __nTp>
 class PhaseHistory {
 public:
+    int id;
     __nTp sph_MATData_preamble_ADF;
     std::vector<__nTp> sph_MATData_Data_SampleData;
     int numRangeSamples;
@@ -42,10 +43,11 @@ public:
     int numAzimuthSamples;
 };
 
-extern int readData(const std::string& inputfile, const std::string& polarity, PhaseHistory<float>& ph);
+extern int readData(const std::string& inputfile, const int MAX_PULSES, const std::string& polarity, PhaseHistory<float>& ph);
 
 template<typename __nTp>
 int sph_sar_data_callback_cpu(
+        int id,
         __nTp sph_MATData_preamble_ADF,
         __nTp *sph_MATData_Data_SampleData,
         int numRangeSamples,
@@ -58,6 +60,7 @@ int sph_sar_data_callback_cpu(
 
 template<typename __nTp>
 int sph_sar_data_callback_gpu(
+        int id,
         __nTp sph_MATData_preamble_ADF,
         __nTp *sph_MATData_Data_SampleData,
         int numRangeSamples,
@@ -70,6 +73,7 @@ int sph_sar_data_callback_gpu(
 
 template<typename __nTp>
 int sar_data_callback(
+        int id,
         __nTp sph_MATData_preamble_ADF,
         __nTp *sph_MATData_Data_SampleData,
         int numRangeSamples,
@@ -81,6 +85,7 @@ int sar_data_callback(
         int numAzimuthSamples) {
 
     sph_sar_data_callback_cpu<__nTp>(
+            id,
             sph_MATData_preamble_ADF,
             sph_MATData_Data_SampleData,
             numRangeSamples,
@@ -92,6 +97,7 @@ int sar_data_callback(
             numAzimuthSamples);
 
     sph_sar_data_callback_gpu<__nTp>(
+            id,
             sph_MATData_preamble_ADF,
             sph_MATData_Data_SampleData,
             numRangeSamples,
@@ -154,7 +160,7 @@ int create_SARAperture(__nTp sph_MATData_preamble_ADF,
 
 template<typename __nTp>
 int create_SARImageFormationParams(const SAR_Aperture<__nTp>& SAR_focusing_data,
-    SAR_ImageFormationParameters<__nTp> &SAR_image_params) {
+        SAR_ImageFormationParameters<__nTp> &SAR_image_params) {
     // to increase the frequency samples to a power of 2
     //SAR_image_params.N_fft = (int) 0x01 << (int) (ceil(log2(SAR_aperture_data.numRangeSamples)));
     SAR_image_params.N_fft = SAR_focusing_data.numRangeSamples;
@@ -177,12 +183,13 @@ int create_SARImageFormationParams(const SAR_Aperture<__nTp>& SAR_focusing_data,
     SAR_image_params.slant_rangeResolution = CLIGHT / (2.0 * SAR_focusing_data.mean_bandwidth);
     SAR_image_params.ground_rangeResolution = SAR_image_params.slant_rangeResolution / std::sin(SAR_focusing_data.mean_Ant_El);
     SAR_image_params.azimuthResolution = CLIGHT / (2.0 * SAR_focusing_data.Ant_totalAz * SAR_focusing_data.mean_startF);
-    
+
     return EXIT_SUCCESS;
 }
 
 template<typename __nTp>
 int sph_sar_data_callback_cpu(
+        int id,
         __nTp sph_MATData_preamble_ADF,
         __nTp *sph_MATData_Data_SampleData,
         int numRangeSamples,
@@ -205,7 +212,7 @@ int sph_sar_data_callback_cpu(
             sph_MATData_Data_radarCoordinateFrame_z,
             numAzimuthSamples,
             SAR_focusing_data);
-    
+
     initialize_SAR_Aperture_Data(SAR_focusing_data);
 
     std::cout << "Data for focusing:" << std::endl;
@@ -215,7 +222,7 @@ int sph_sar_data_callback_cpu(
     //SAR_ImageFormationParameters<__nTp>::create<__nTp>(SAR_focusing_data);
 
     create_SARImageFormationParams(SAR_focusing_data, SAR_image_params);
-    
+
     std::cout << SAR_image_params << std::endl;
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
@@ -239,6 +246,7 @@ void cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
 template<typename __nTp>
 int sph_sar_data_callback_gpu(
+        int id,
         __nTp sph_MATData_preamble_ADF,
         __nTp *sph_MATData_Data_SampleData,
         int numRangeSamples,
@@ -271,7 +279,7 @@ int sph_sar_data_callback_gpu(
     //SAR_ImageFormationParameters<__nTp>::create<__nTp>(SAR_focusing_data);
 
     create_SARImageFormationParams(SAR_focusing_data, SAR_image_params);
-    
+
     std::cout << SAR_image_params << std::endl;
 
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
