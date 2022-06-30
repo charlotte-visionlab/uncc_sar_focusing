@@ -39,6 +39,12 @@ int main(int argc, char **argv) {
     }
     bool debug = result["debug"].as<bool>();
 
+    if (result.count("output")) {
+        outputfile = result["output"].as<std::string>();
+    } else { 
+        outputfile =  "output_gpu.bmp";
+    }
+    
     std::string inputfile;
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();

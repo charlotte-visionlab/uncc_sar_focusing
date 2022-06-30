@@ -28,6 +28,8 @@
 #include <vector>
 #include <string>
 
+extern std::string outputfile;
+
 template<typename __nTp>
 class PhaseHistory {
 public:
@@ -231,10 +233,10 @@ int sph_sar_data_callback_cpu(
     focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image);
 
     // Required parameters for output generation manually overridden by command line arguments
-    std::string output_filename = "output_cpu.bmp";
+    //std::string output_filename = "output_cpu.bmp";
     SAR_image_params.dyn_range_dB = 70;
 
-    writeBMPFile(SAR_image_params, output_image, output_filename);
+    writeBMPFile(SAR_image_params, output_image, outputfile);
 
     return EXIT_SUCCESS;
 }
@@ -287,10 +289,10 @@ int sph_sar_data_callback_gpu(
     cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image);
 
     // Required parameters for output generation manually overridden by command line arguments
-    std::string output_filename = "output_gpu.bmp";
+    // std::string output_filename = "output_gpu.bmp";
     SAR_image_params.dyn_range_dB = 70;
 
-    writeBMPFile(SAR_image_params, output_image, output_filename);
+    writeBMPFile(SAR_image_params, output_image, outputfile);
 
     return EXIT_SUCCESS;
 }

@@ -40,8 +40,14 @@ int main(int argc, char **argv) {
         exit(0);
     }
     bool debug = result["debug"].as<bool>();
-    std::string inputfile;
 
+    if (result.count("output")) {
+        outputfile = result["output"].as<std::string>();
+    } else { 
+        outputfile =  "output_cpu.bmp";
+    }
+    
+    std::string inputfile;    
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();
     } else {

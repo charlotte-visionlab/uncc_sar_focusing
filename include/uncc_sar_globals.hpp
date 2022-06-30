@@ -30,6 +30,8 @@
 #define LOADBMP_IMPLEMENTATION
 #include <loadbmp.h>
 
+std::string outputfile;
+
 std::string HARDCODED_SARDATA_PATH = "/home/arwillis/sar/";
 
 std::string Sandia_RioGrande_fileprefix = HARDCODED_SARDATA_PATH + "Sandia/Rio_Grande_UUR_SAND2021-1834_O/SPH/PHX1T03_PS0008_PT0000";
