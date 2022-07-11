@@ -26,3 +26,7 @@ using ComplexArrayType = CArray<NumericType>;
 template void cuda_focus_SAR_image<float, float>(SAR_Aperture<float> const&,
         SAR_ImageFormationParameters<float> const&,
         std::valarray<unccComplex<float> >&);
+
+template void cuda_focus_SAR_image<double, double>(SAR_Aperture<double> const&,
+                                                 SAR_ImageFormationParameters<double> const&,
+                                                 std::valarray<unccComplex<double> >&);

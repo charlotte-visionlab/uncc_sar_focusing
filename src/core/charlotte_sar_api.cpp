@@ -33,9 +33,10 @@ using NumericType = float;
 using ComplexType = Complex<NumericType>;
 //using ComplexArrayType = CArray<NumericType>;
 
-int readData(const std::string& inputfile, const int MAX_PULSES, const std::string& polarity, PhaseHistory<float>& ph) {
+int readData(const std::string &inputfile, const int MAX_PULSES,
+             const std::string &polarity, PhaseHistory<float> &ph, bool verbose) {
 
-    std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
+    std::unordered_map<std::string, matvar_t *> matlab_readvar_map;
 
     initialize_Sandia_SPHRead(matlab_readvar_map);
     initialize_GOTCHA_MATRead(matlab_readvar_map);
@@ -46,7 +47,8 @@ int readData(const std::string& inputfile, const int MAX_PULSES, const std::stri
         return EXIT_FAILURE;
     }
     // Print out raw data imported from file
-    std::cout << SAR_aperture_data << std::endl;
+    if (verbose)
+        std::cout << SAR_aperture_data << std::endl;
 
     if ((polarity == "HH" || polarity == "any") && SAR_aperture_data.sampleData.shape.size() >= 1) {
         SAR_aperture_data.polarity_channel = 0;
@@ -81,15 +83,18 @@ int readData(const std::string& inputfile, const int MAX_PULSES, const std::stri
         SAR_focusing_data = SAR_aperture_data;
     }
 
-    int numPulses = (MAX_PULSES > SAR_focusing_data.numAzimuthSamples) ? SAR_focusing_data.numAzimuthSamples : MAX_PULSES;
+    int numPulses = (MAX_PULSES > SAR_focusing_data.numAzimuthSamples) ? SAR_focusing_data.numAzimuthSamples
+                                                                       : MAX_PULSES;
     int firstPulseIndex = (SAR_focusing_data.numAzimuthSamples - numPulses) / 2;
-    int lastPulseIndex = (SAR_focusing_data.numAzimuthSamples + numPulses - 1) / 2 + ((SAR_focusing_data.numAzimuthSamples + numPulses) % 2);
+    int lastPulseIndex = (SAR_focusing_data.numAzimuthSamples + numPulses - 1) / 2 +
+                         ((SAR_focusing_data.numAzimuthSamples + numPulses) % 2);
     std::vector<int> pulseIndices(numPulses);
     for (std::vector<int>::iterator pIter = pulseIndices.begin(); pIter != pulseIndices.end(); ++pIter) {
         *pIter = firstPulseIndex++;
     }
-    
-    std::cout << "SAR focusing data = " << SAR_focusing_data << std::endl;
+
+    if (verbose)
+        std::cout << "SAR focusing data = " << SAR_focusing_data << std::endl;
     // Allocate memory for data to pass to library function call
     ph.sph_MATData_Data_SampleData.resize(2 * SAR_focusing_data.numRangeSamples * numPulses);
     ph.sph_MATData_Data_StartF.resize(numPulses);
@@ -112,13 +117,15 @@ int readData(const std::string& inputfile, const int MAX_PULSES, const std::stri
         int pulseSrcOffset = pulseSrcIndex * SAR_focusing_data.numRangeSamples;
         for (int frequencyIndex = 0; frequencyIndex < SAR_focusing_data.numRangeSamples; frequencyIndex++) {
             //std::cout << *cmplx_val << std::endl;
-            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 0] = vec_SampleData[pulseSrcOffset + frequencyIndex]._M_real;
-            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 1] = vec_SampleData[pulseSrcOffset + frequencyIndex]._M_imag;
+            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 0] = vec_SampleData[pulseSrcOffset +
+                                                                                                     frequencyIndex]._M_real;
+            ph.sph_MATData_Data_SampleData[pulseTgtOffset + frequencyIndex * 2 + 1] = vec_SampleData[pulseSrcOffset +
+                                                                                                     frequencyIndex]._M_imag;
             //pulseTgtIndex++;
         }
         pulseTgtOffset += SAR_focusing_data.numRangeSamples * 2;
     }
-    
+
     std::vector<NumericType> vec_StartF = SAR_focusing_data.startF.toVector<NumericType>();
     std::vector<NumericType> vec_ChirpRate = SAR_focusing_data.chirpRate.toVector<NumericType>();
     std::vector<NumericType> vec_radarCoordinateFrame_x = SAR_focusing_data.Ant_x.toVector<NumericType>();

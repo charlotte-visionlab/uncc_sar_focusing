@@ -19,7 +19,8 @@
 #include <iomanip>
 #include <sstream>
 
-#include <cxxopts.hpp>
+#include <third_party/log.h>
+#include <third_party/cxxopts.hpp>
 
 // this declaration needs to be in any C++ compiled target for CPU
 #define CUDAFUNCTION
@@ -43,11 +44,11 @@ int main(int argc, char **argv) {
 
     if (result.count("output")) {
         outputfile = result["output"].as<std::string>();
-    } else { 
-        outputfile =  "output_cpu.bmp";
+    } else {
+        outputfile = "output_cpu.bmp";
     }
-    
-    std::string inputfile;    
+
+    std::string inputfile;
     if (result.count("input")) {
         inputfile = result["input"].as<std::string>();
     } else {
@@ -73,14 +74,16 @@ int main(int argc, char **argv) {
     // Sandia SAR data is multi-channel having up to 4 polarities
     // 1 = HH, 2 = HV, 3 = VH, 4 = VVbandwidth = 0:freq_per_sample:(numRangeSamples-1)*freq_per_sample;
     std::string polarity = result["polarity"].as<std::string>();
-
-    std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
+    if (verbose)
+        std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
     PhaseHistory<float> ph;
     ph.id = 0;
 
     int MAX_PULSES = 200;
-    readData(inputfile, MAX_PULSES, polarity, ph);
+    readData(inputfile, MAX_PULSES, polarity, ph, verbose);
+
+    initLogger(("logfile_" + DateTime() + ".log").c_str(), ldebug);
 
     //focus_SAR_image(SAR_aperture_data, SAR_image_params, output_image);
     sph_sar_data_callback_cpu<float>(
@@ -94,7 +97,9 @@ int main(int argc, char **argv) {
             ph.sph_MATData_Data_radarCoordinateFrame_y.data(),
             ph.sph_MATData_Data_radarCoordinateFrame_z.data(),
             ph.numAzimuthSamples
-            );
+    );
+
+    endLogger();
 
     return EXIT_SUCCESS;
 }

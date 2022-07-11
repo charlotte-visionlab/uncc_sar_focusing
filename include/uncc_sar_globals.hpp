@@ -45,7 +45,7 @@ std::string Sandia_Farms_filepostfix = "_N03_M1";
 std::string GOTCHA_fileprefix = HARDCODED_SARDATA_PATH + "GOTCHA/Gotcha-CP-All/DATA/pass1/HH/data_3dsar_pass1_az";
 // index here is 3 digit azimuth [001,...,360]
 std::string GOTCHA_filepostfix = "_HH";
-
+bool verbose = false;
 void cxxopts_integration(cxxopts::Options& options) {
 
     options.add_options()
@@ -53,6 +53,7 @@ void cxxopts_integration(cxxopts::Options& options) {
             //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
             ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
             ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
+            ("v,verbose", "Enable verbose output", cxxopts::value<bool>(verbose))
             ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
             ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
             ("h,help", "Print usage")
