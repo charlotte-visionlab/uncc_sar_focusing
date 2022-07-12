@@ -209,6 +209,7 @@ int sph_sar_data_callback_cpu(
         __nTp *sph_MATData_Data_radarCoordinateFrame_z,
         int numAzimuthSamples) {
 
+    L_(linfo) << "Received data with Id = " << id;
     SAR_Aperture<__nTp> SAR_focusing_data;
 
     create_SARAperture(sph_MATData_preamble_ADF,
@@ -270,6 +271,7 @@ int sph_sar_data_callback_gpu(
         __nTp *sph_MATData_Data_radarCoordinateFrame_z,
         int numAzimuthSamples) {
 
+    L_(linfo) << "Received data with Id = " << id;
     SAR_Aperture<__nTp> SAR_focusing_data;
 
     create_SARAperture(sph_MATData_preamble_ADF,
