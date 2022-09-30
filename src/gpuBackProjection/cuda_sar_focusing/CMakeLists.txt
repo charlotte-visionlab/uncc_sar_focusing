@@ -24,6 +24,8 @@ add_library(lib_uncc_sar_focusing_gpu SHARED
     libcuda_sar_focusing.cu 
     ../../core/uncc_sar_matio.cpp
     ../../core/charlotte_sar_api.cpp)
+set_target_properties(lib_uncc_sar_focusing_gpu
+        PROPERTIES OUTPUT_NAME uncc_sar_focusing_gpu)
 
 if (Matlab_FOUND)
 

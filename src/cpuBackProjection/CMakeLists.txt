@@ -18,9 +18,11 @@ add_executable(uncc_sar_focusing_cpu
 target_link_libraries(uncc_sar_focusing_cpu ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} matio)
 #set_target_properties(cpuBackProjection_test PROPERTIES COMPILE_DEFINITIONS "NO_MATLAB=1")
 
-add_library(lib_uncc_sar_focusing_cpu SHARED 
+add_library(lib_uncc_sar_focusing_cpu SHARED
     ../core/uncc_sar_matio.cpp
     ../core/charlotte_sar_api.cpp)
+set_target_properties(lib_uncc_sar_focusing_cpu
+        PROPERTIES OUTPUT_NAME uncc_sar_focusing_cpu)
 
 if (Matlab_FOUND)
 

@@ -1,3 +1,6 @@
 [submodule "third_party/matio"]
 	path = third_party/matio
 	url = https://github.com/tbeu/matio.git
+[submodule "third_party/cuGridSearch"]
+	path = third_party/cuGridSearch
+	url = https://github.com/uncc-visionlab/cuGridSearch.git

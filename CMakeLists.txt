@@ -34,6 +34,7 @@ include_directories(
     ./include
     ./include/third_party
     third_party/matio/src
+    third_party/cuGridSearch/include
     ${PROJECT_BINARY_DIR}/third_party/matio/src
 )
 link_directories(
