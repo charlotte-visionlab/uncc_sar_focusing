@@ -107,12 +107,14 @@ int main(int argc, char **argv) {
         SAR_aperture_data.polarity_dimension = 2;
     }
 
+    initialize_SAR_Aperture_Data(SAR_aperture_data);
+
     SAR_ImageFormationParameters<NumericType> SAR_image_params =
             SAR_ImageFormationParameters<NumericType>();
 
     // to increase the frequency samples to a power of 2
-    SAR_image_params.N_fft = (int) 0x01 << (int) (ceil(log2(SAR_aperture_data.numRangeSamples)));
-    //SAR_image_params.N_fft = aperture.numRangeSamples;
+    //SAR_image_params.N_fft = (int) 0x01 << (int) (ceil(log2(SAR_aperture_data.numRangeSamples)));
+    SAR_image_params.N_fft = SAR_aperture_data.numRangeSamples;
     SAR_image_params.N_x_pix = SAR_aperture_data.numAzimuthSamples;
     //SAR_image_params.N_y_pix = image_params.N_fft;
     SAR_image_params.N_y_pix = SAR_aperture_data.numRangeSamples;
@@ -133,7 +135,6 @@ int main(int argc, char **argv) {
     SAR_image_params.ground_rangeResolution = SAR_image_params.slant_rangeResolution / std::sin(SAR_aperture_data.mean_Ant_El);
     SAR_image_params.azimuthResolution = CLIGHT / (2.0 * SAR_aperture_data.Ant_totalAz * SAR_aperture_data.mean_startF);
 
-    initialize_SAR_Aperture_Data(SAR_aperture_data);
     // Print out data after critical data fields for SAR focusing have been computed
     std::cout << SAR_aperture_data << std::endl;
 
