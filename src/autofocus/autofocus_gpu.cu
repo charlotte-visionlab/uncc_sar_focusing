@@ -319,7 +319,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     nv_ext::Vec<grid_precision, grid_dimension> testHolderVec(testHolder);
 
     c1 = clock();
-    gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+    gridsearcher.search_by_value_stream(host_func_byval_ptr, 50, 451,
     // gridsearcher.search_by_value(host_func_byval_ptr,
             data_p,
             numRSamples, numASamples,
