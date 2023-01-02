@@ -40,7 +40,7 @@
 
 typedef float NumericType;
 
-#define grid_dimension 6        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension 9        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
 typedef float grid_precision;   // the type of values in the grid, e.g., float, double, int, etc.
 typedef float func_precision;   // the type of values taken by the error function, e.g., float, double, int, etc.
 typedef float pixel_precision; // the type of values in the image, e.g., float, double, int, etc.
@@ -127,8 +127,47 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
 
     __nTp numC = sumY * sumXX - sumX * sumXY;
     
-    coeffs[0] = numS/den;
-    coeffs[1] = numC/den;
+    coeffs[0] = 0;
+    coeffs[1] = numS/den;
+    coeffs[2] = numC/den;
+
+}
+
+template<typename __nTp>
+void quadFit(__nTp* coeffs, std::vector<__nTp> values) {
+    int numN = values.size();
+    __nTp N = numN;
+    __nTp x1 = 0;
+    __nTp x2 = 0;
+    __nTp x3 = 0;
+    __nTp x4 = 0;
+    __nTp f0 = 0;
+    __nTp f1 = 0;
+    __nTp f2 = 0;
+
+    for (int i = 0; i < numN; i++) {
+        x1 += i;
+        x2 += i * i;
+        x3 += i * i * i;
+        x4 += i * i * i * i;
+        f0 += values[i];
+        f1 += values[i] * i;
+        f2 += values[i] * i * i;
+    }
+
+    __nTp D = x4 * x1 * x1 - 2 * x1 * x2 * x3 + x2 * x2 * x2 - N * x4 * x2 + N * x3 * x3;
+
+    __nTp a = f2 * x1 * x1 - f1 * x1 * x2 - f0 * x3 * x1 + f0 * x2 * x2 - N * f2 * x2 + N * f1 * x3;
+    __nTp b = f1 * x2 * x2 - N * f1 *x4 + N * f2 * x3 + f0 * x1 * x4 - f0 * x2 * x3 - f2 * x1 * x2;
+    __nTp c = f2 * x2 * x2 - f1 * x2 * x3 - f0 * x4 * x2 + f0 * x3 * x3 - f2 * x1 * x3 + f1 * x1 * x4;
+
+    a /= D;
+    b /= D;
+    c /= D;
+    
+    coeffs[0] = a;
+    coeffs[1] = b;
+    coeffs[2] = c;
 
 }
 
@@ -137,7 +176,7 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
 template <typename __nTp, typename __nTpParams>
 void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
-        CArray<__nTp>& output_image, std::ofstream* myfile) {
+        CArray<__nTp>& output_image, std::ofstream* myfile, int multiRes, int style) {
 
     switch (sar_image_params.algorithm) {
         case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
@@ -245,21 +284,30 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
 #else
     // LINE FITTING BASED ON PULSE
-    float * xCoeffs = new float[2];
-    float * yCoeffs = new float[2];
-    float * zCoeffs = new float[2];
+    float * xCoeffs = new float[3];
+    float * yCoeffs = new float[3];
+    float * zCoeffs = new float[3];
 
     std::vector<NumericType> xPossDiff = vectorDiff(sar_data.Ant_x.data);
     std::vector<NumericType> yPossDiff = vectorDiff(sar_data.Ant_y.data);
     std::vector<NumericType> zPossDiff = vectorDiff(sar_data.Ant_z.data);
 
-    bestFit<NumericType>(xCoeffs, xPossDiff);
-    bestFit<NumericType>(yCoeffs, yPossDiff);
-    bestFit<NumericType>(zCoeffs, zPossDiff);
+    if(style == 0) {
+        printf("Using Linear Model\n");
+        bestFit<NumericType>(xCoeffs, xPossDiff);
+        bestFit<NumericType>(yCoeffs, yPossDiff);
+        bestFit<NumericType>(zCoeffs, zPossDiff);
+    }
+    else{
+        printf("Using Quadratic Model\n");
+        quadFit<NumericType>(xCoeffs, xPossDiff);
+        quadFit<NumericType>(yCoeffs, yPossDiff);
+        quadFit<NumericType>(zCoeffs, zPossDiff);
+    }
 
-    printf("X - Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[0],xCoeffs[1]);
-    printf("Y - Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[0],yCoeffs[1]);
-    printf("Z - Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[0],zCoeffs[1]);
+    printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[0],xCoeffs[1],xCoeffs[2]);
+    printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[0],yCoeffs[1],yCoeffs[2]);
+    printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[0],zCoeffs[1],zCoeffs[2]);
 
     *myfile << "gt," << xCoeffs[0] << ',' << xCoeffs[1] << ','
                     << yCoeffs[0] << ',' << yCoeffs[1] << ',' 
@@ -269,41 +317,17 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     grid_precision gridDiff = 1e-4f;
     grid_precision gridN = 11;
 
-    std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0]-gridDiff, (grid_precision) xCoeffs[1], 
-                                               (grid_precision) yCoeffs[0]-gridDiff, (grid_precision) yCoeffs[1],
-                                               (grid_precision) zCoeffs[0]-gridDiff, (grid_precision) zCoeffs[1]};
-    std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0]+gridDiff, (grid_precision) xCoeffs[1], 
-                                             (grid_precision) yCoeffs[0]+gridDiff, (grid_precision) yCoeffs[1],
-                                             (grid_precision) zCoeffs[0]+gridDiff, (grid_precision) zCoeffs[1]};
-    std::vector<grid_precision> grid_numSamples = {(grid_precision) gridN, (grid_precision) 1,
-                                              (grid_precision) gridN, (grid_precision) 1,
-                                              (grid_precision) gridN, (grid_precision) 1};
+    std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2], 
+                                               (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff, (grid_precision) yCoeffs[2],
+                                               (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2]};
+    std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff, (grid_precision) xCoeffs[2], 
+                                             (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff, (grid_precision) yCoeffs[2],
+                                             (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2]};
+    std::vector<grid_precision> grid_numSamples = {(grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
+                                              (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
+                                              (grid_precision)1, (grid_precision) gridN, (grid_precision) 1};
 
-    CudaGrid<grid_precision, grid_dimension> grid;
-    ck(cudaMalloc(&grid.data(), grid.bytesSize()));
-
-    grid.setStartPoint(start_point);
-    grid.setEndPoint(end_point);
-    grid.setNumSamples(grid_numSamples);
-    grid.display("grid");
-
-    grid_precision axis_sample_counts[grid_dimension];
-    grid.getAxisSampleCounts(axis_sample_counts);
-
-    CudaTensor<func_precision, grid_dimension> func_values(axis_sample_counts);
-    ck(cudaMalloc(&func_values._data, func_values.bytesSize()));
-
-    // first template argument is the error function return type
-    // second template argument is the grid point value type
-    CudaGridSearcher<func_precision, grid_precision, grid_dimension> gridsearcher(grid, func_values);
-
-    image_err_func_byvalue host_func_byval_ptr;
-    // Copy device function pointer for the function having by-value parameters to host side
-    cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr,
-                         sizeof(image_err_func_byvalue));
-
-    checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
-
+    // Put all of this outside the for loop
     int numRSamples = sar_data.numRangeSamples, numASamples = sar_data.numAzimuthSamples;
     cufftComplex* data_p = cuda_res.getDeviceMemPointer<cufftComplex>("sampleData");
     __nTp* ax_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_x");
@@ -318,40 +342,81 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     grid_precision testHolder[] = {xCoeffs[0], xCoeffs[1], yCoeffs[0], yCoeffs[1], zCoeffs[0], zCoeffs[1]};
     nv_ext::Vec<grid_precision, grid_dimension> testHolderVec(testHolder);
 
-    c1 = clock();
-    gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
-    // gridsearcher.search_by_value(host_func_byval_ptr,
-            data_p,
-            numRSamples, numASamples,
-            delta_x_m_per_pix, delta_y_m_per_pix,
-            left_m, bottom_m, 
-            minRange, maxRange,
-            ax_p,
-            ay_p,
-            az_p,
-            sr_p,
-            sf_p,
-            sip_p,
-            rv_p);
-    c2 = clock();
-    float searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
-    printf("INFO: cuGridSearch took %f ms.\n", searchTime);
+    image_err_func_byvalue host_func_byval_ptr;
+    // Copy device function pointer for the function having by-value parameters to host side
+    cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr,
+                        sizeof(image_err_func_byvalue));
 
-    *myfile << "time," << searchTime << ',';
+    checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
 
-    func_precision min_value;
-    int32_t min_value_index1d;
-    func_values.find_extrema(min_value, min_value_index1d);
-    
+    float totalTime = 0;
+
     grid_precision minParams[grid_dimension] = {0};
-    grid_precision min_grid_point[grid_dimension];
-    grid.getGridPoint(min_grid_point, min_value_index1d);
-    std::cout << "Minimum found at point p = { ";
-    for (int d=0; d < grid_dimension; d++) {
-        minParams[d] = min_grid_point[d];
-        std::cout << min_grid_point[d] << ((d < grid_dimension -1) ? ", " : " ");
+
+    for(int iii = 0; iii < multiRes; iii++) {
+        CudaGrid<grid_precision, grid_dimension> grid;
+        ck(cudaMalloc(&grid.data(), grid.bytesSize()));
+
+        grid.setStartPoint(start_point);
+        grid.setEndPoint(end_point);
+        grid.setNumSamples(grid_numSamples);
+        grid.display("grid");
+
+        grid_precision axis_sample_counts[grid_dimension];
+        grid.getAxisSampleCounts(axis_sample_counts);
+
+        CudaTensor<func_precision, grid_dimension> func_values(axis_sample_counts);
+        ck(cudaMalloc(&func_values._data, func_values.bytesSize()));
+
+        // first template argument is the error function return type
+        // second template argument is the grid point value type
+        CudaGridSearcher<func_precision, grid_precision, grid_dimension> gridsearcher(grid, func_values);
+
+        c1 = clock();
+        gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+        // gridsearcher.search_by_value(host_func_byval_ptr,
+                data_p,
+                numRSamples, numASamples,
+                delta_x_m_per_pix, delta_y_m_per_pix,
+                left_m, bottom_m, 
+                minRange, maxRange,
+                ax_p,
+                ay_p,
+                az_p,
+                sr_p,
+                sf_p,
+                sip_p,
+                rv_p);
+        c2 = clock();
+        float searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
+        printf("INFO: cuGridSearch took %f ms.\n", searchTime);
+
+        totalTime += searchTime;
+
+        func_precision min_value;
+        int32_t min_value_index1d;
+        func_values.find_extrema(min_value, min_value_index1d);
+        
+        grid_precision min_grid_point[grid_dimension];
+        grid.getGridPoint(min_grid_point, min_value_index1d);
+        std::cout << "Minimum found at point p = { ";
+        for (int d=0; d < grid_dimension; d++) {
+            minParams[d] = min_grid_point[d];
+            std::cout << min_grid_point[d] << ((d < grid_dimension -1) ? ", " : " ");
+
+            start_point[d] = min_grid_point[d] - (end_point[d] - start_point[d]) / 4;
+            end_point[d] = min_grid_point[d] + (end_point[d] - start_point[d]) / 4;
+            // Update grid here or outside (basically somewhere near here)
+        }
+        std::cout << "}" << std::endl;
+
+        ck(cudaFree(grid.data()));
+        ck(cudaFree(func_values.data()));
+
     }
-    std::cout << "}" << std::endl;
+
+    printf("Total time took: %f\n", totalTime);
+    *myfile << "time," << totalTime << ',';
 
     printf("MinParams[");
     for(int d = 0; d < grid_dimension; d++) {
@@ -416,9 +481,6 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     delete yCoeffs;
     delete zCoeffs;
 
-    ck(cudaFree(grid.data()));
-    ck(cudaFree(func_values.data()));
-
     if (finalize_CUDAResources(sar_data, sar_image_params, cuda_res) == EXIT_FAILURE) {
         std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..." << std::endl;
         return;
@@ -442,6 +504,8 @@ int main(int argc, char **argv) {
         exit(0);
     }
     bool debug = result["debug"].as<bool>();
+    int multiRes = result["multi"].as<int>();
+    int style = result["style"].as<int>();
 
     initialize_Sandia_SPHRead(matlab_readvar_map);
     initialize_GOTCHA_MATRead(matlab_readvar_map);
@@ -555,7 +619,8 @@ int main(int argc, char **argv) {
     printf("Main: deltaAz = %f, deltaF = %f, mean_startF = %f\nmaxWx_m = %f, maxWy_m = %f, Wx_m = %f, Wy_m = %f\nX_pix = %d, Y_pix = %d\nNum Az = %d, Num range = %d\n", SAR_aperture_data.mean_Ant_deltaAz, SAR_aperture_data.mean_startF, SAR_aperture_data.mean_deltaF, SAR_image_params.max_Wx_m, SAR_image_params.max_Wy_m, SAR_image_params.Wx_m, SAR_image_params.Wy_m, SAR_image_params.N_x_pix, SAR_image_params.N_y_pix, SAR_aperture_data.numAzimuthSamples, SAR_aperture_data.numRangeSamples);
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
-    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile);
+    if (multiRes < 1) multiRes = 1;
+    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style);
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();

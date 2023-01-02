@@ -213,9 +213,9 @@ __device__ func_precision kernelWrapper(nv_ext::Vec<grid_precision, D> &paramete
     Ant_z_new[0] = Ant_z[0];
 
     for(int i = 0; i < numAzimuthSamples-1; i++) {
-        Ant_x_new[1+i] = Ant_x_new[i]+parameters[0]*i+parameters[1];
-        Ant_y_new[1+i] = Ant_y_new[i]+parameters[2]*i+parameters[3];
-        Ant_z_new[1+i] = Ant_z_new[i]+parameters[4]*i+parameters[5];
+        Ant_x_new[1+i] = Ant_x_new[i]+parameters[0]*i*i+parameters[1]*i+parameters[2];
+        Ant_y_new[1+i] = Ant_y_new[i]+parameters[3]*i*i+parameters[4]*i+parameters[5];
+        Ant_z_new[1+i] = Ant_z_new[i]+parameters[6]*i*i+parameters[7]*i+parameters[8];
     }
 
     grid_backprojection_loop(sampleData, 
@@ -269,9 +269,9 @@ __global__ void computeImageKernel(nv_ext::Vec<grid_precision, D> parameters,
     Ant_z_new[0] = Ant_z[0];
 
     for(int i = 0; i < numAzimuthSamples-1; i++) {
-        Ant_x_new[1+i] = Ant_x_new[i]+parameters[0]*i+parameters[1];
-        Ant_y_new[1+i] = Ant_y_new[i]+parameters[2]*i+parameters[3];
-        Ant_z_new[1+i] = Ant_z_new[i]+parameters[4]*i+parameters[5];
+        Ant_x_new[1+i] = Ant_x_new[i]+parameters[0]*i*i+parameters[1]*i+parameters[2];
+        Ant_y_new[1+i] = Ant_y_new[i]+parameters[3]*i*i+parameters[4]*i+parameters[5];
+        Ant_z_new[1+i] = Ant_z_new[i]+parameters[6]*i*i+parameters[7]*i+parameters[8];
     }
 
     temp_grid_backprojection_loop(sampleData, 
