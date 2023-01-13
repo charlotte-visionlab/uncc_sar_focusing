@@ -109,41 +109,76 @@ std::vector<__nTp> vectorAppendCumSum(__nTp start, std::vector<__nTp> values) {
 
 template<typename __nTp>
 void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
-    __nTp sumX = 0.0;
-    __nTp sumY = 0.0;
-    __nTp N = values.size();
-    __nTp sumXY = 0.0;
-    __nTp sumXX = 0.0;
+    // double sumX = 0.0;
+    // double sumY = 0.0;
+    // double N = values.size();
+    // double sumXY = 0.0;
+    // double sumXX = 0.0;
 
-    for (int i =0; i < values.size(); i++) {
-        sumX += (__nTp)i;
-        sumY += values[i];
-        sumXY += ((__nTp)i*values[i]);
-        sumXX += ((__nTp)i * (__nTp)i);
+    // for (int i =0; i < values.size(); i++) {
+    //     sumX += (__nTp)i;
+    //     sumY += values[i];
+    //     sumXY += ((__nTp)i*values[i]);
+    //     sumXX += ((__nTp)i * (__nTp)i);
+    // }
+
+    // double numS = N * sumXY - sumX * sumY;
+    // double den = N * sumXX - sumX * sumX;
+
+    // double numC = sumY * sumXX - sumX * sumXY;
+    
+    // double temp1 = numS/den;
+    // double temp2 = numC/den;
+
+    // float tempa = (float)temp1;
+    // float tempb = (float)temp2;
+
+    // coeffs[0] = 0;
+    // coeffs[1] = tempa;
+    // coeffs[2] = tempb;
+
+    int numN = values.size();
+    double N = numN;
+    double x1 = 0;
+    double x2 = 0;
+    double f0 = 0;
+    double f1 = 0;
+
+    for (int i = 0; i < numN; i++) {
+        x1 += i;
+        x2 += i * i;
+        f0 += values[i];
+        f1 += values[i] * i;
     }
 
-    __nTp numS = N * sumXY - sumX * sumY;
-    __nTp den = N * sumXX - sumX * sumX;
+    double D = -1 * x1 * x1 + N * x2;
 
-    __nTp numC = sumY * sumXX - sumX * sumXY;
-    
+    double a = N * f1 - f0 * x1;
+    double b = f0 * x2 - f1 * x1;
+    printf("N = %f\nx1 = %f\nx2 = %f\nf0 = %f\nf1 = %f\n", N, x1, x2, f0, f1);
+    printf("a = %f\nb = %f\n D = %f\n", a, b, D);
+    a /= D;
+    b /= D;
+    printf("a1 = %f\nb2 = %f\n", a, b);
+    float temp_a = (float)a;
+    float temp_b = (float)b;
+    printf("temp_a = %f\ntemp_b = %f\n", temp_a, temp_b);
     coeffs[0] = 0;
-    coeffs[1] = numS/den;
-    coeffs[2] = numC/den;
-
+    coeffs[1] = temp_a;
+    coeffs[2] = temp_b;
 }
 
 template<typename __nTp>
 void quadFit(__nTp* coeffs, std::vector<__nTp> values) {
     int numN = values.size();
-    __nTp N = numN;
-    __nTp x1 = 0;
-    __nTp x2 = 0;
-    __nTp x3 = 0;
-    __nTp x4 = 0;
-    __nTp f0 = 0;
-    __nTp f1 = 0;
-    __nTp f2 = 0;
+    double N = numN;
+    double x1 = 0;
+    double x2 = 0;
+    double x3 = 0;
+    double x4 = 0;
+    double f0 = 0;
+    double f1 = 0;
+    double f2 = 0;
 
     for (int i = 0; i < numN; i++) {
         x1 += i;
@@ -155,19 +190,23 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values) {
         f2 += values[i] * i * i;
     }
 
-    __nTp D = x4 * x1 * x1 - 2 * x1 * x2 * x3 + x2 * x2 * x2 - N * x4 * x2 + N * x3 * x3;
+    double D = x4 * x1 * x1 - 2 * x1 * x2 * x3 + x2 * x2 * x2 - N * x4 * x2 + N * x3 * x3;
 
-    __nTp a = f2 * x1 * x1 - f1 * x1 * x2 - f0 * x3 * x1 + f0 * x2 * x2 - N * f2 * x2 + N * f1 * x3;
-    __nTp b = f1 * x2 * x2 - N * f1 *x4 + N * f2 * x3 + f0 * x1 * x4 - f0 * x2 * x3 - f2 * x1 * x2;
-    __nTp c = f2 * x2 * x2 - f1 * x2 * x3 - f0 * x4 * x2 + f0 * x3 * x3 - f2 * x1 * x3 + f1 * x1 * x4;
+    double a = f2 * x1 * x1 - f1 * x1 * x2 - f0 * x3 * x1 + f0 * x2 * x2 - N * f2 * x2 + N * f1 * x3;
+    double b = f1 * x2 * x2 - N * f1 *x4 + N * f2 * x3 + f0 * x1 * x4 - f0 * x2 * x3 - f2 * x1 * x2;
+    double c = f2 * x2 * x2 - f1 * x2 * x3 - f0 * x4 * x2 + f0 * x3 * x3 - f2 * x1 * x3 + f1 * x1 * x4;
 
     a /= D;
     b /= D;
     c /= D;
+
+    float temp_a = (float)a;
+    float temp_b = (float)b;
+    float temp_c = (float)c;
     
-    coeffs[0] = a;
-    coeffs[1] = b;
-    coeffs[2] = c;
+    coeffs[0] = temp_a;
+    coeffs[1] = temp_b;
+    coeffs[2] = temp_c;
 
 }
 
@@ -288,33 +327,42 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     float * yCoeffs = new float[3];
     float * zCoeffs = new float[3];
 
+    // TODO: CHANGE PULSE NUMBERS, 10, 20, 30 for linear
+
     std::vector<NumericType> xPossDiff = vectorDiff(sar_data.Ant_x.data);
     std::vector<NumericType> yPossDiff = vectorDiff(sar_data.Ant_y.data);
     std::vector<NumericType> zPossDiff = vectorDiff(sar_data.Ant_z.data);
 
     if(style == 0) {
         printf("Using Linear Model\n");
-        bestFit<NumericType>(xCoeffs, xPossDiff);
-        bestFit<NumericType>(yCoeffs, yPossDiff);
-        bestFit<NumericType>(zCoeffs, zPossDiff);
+        // bestFit<NumericType>(xCoeffs, xPossDiff);
+        // bestFit<NumericType>(yCoeffs, yPossDiff);
+        // bestFit<NumericType>(zCoeffs, zPossDiff);
+        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data);
+        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data);
+        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data);
     }
     else{
         printf("Using Quadratic Model\n");
-        quadFit<NumericType>(xCoeffs, xPossDiff);
-        quadFit<NumericType>(yCoeffs, yPossDiff);
-        quadFit<NumericType>(zCoeffs, zPossDiff);
+        // quadFit<NumericType>(xCoeffs, xPossDiff);
+        // quadFit<NumericType>(yCoeffs, yPossDiff);
+        // quadFit<NumericType>(zCoeffs, zPossDiff);
+        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data);
+        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data);
+        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data);
     }
 
     printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[0],xCoeffs[1],xCoeffs[2]);
     printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[0],yCoeffs[1],yCoeffs[2]);
     printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[0],zCoeffs[1],zCoeffs[2]);
 
-    *myfile << "gt," << xCoeffs[0] << ',' << xCoeffs[1] << ','
-                    << yCoeffs[0] << ',' << yCoeffs[1] << ',' 
-                    << zCoeffs[0] << ',' << zCoeffs[1] << ',';
+    *myfile << "gt," << xCoeffs[0] << ',' << xCoeffs[1] << ',' << xCoeffs[2] << ','
+                    << yCoeffs[0] << ',' << yCoeffs[1] << ',' << yCoeffs[2] << ','
+                    << zCoeffs[0] << ',' << zCoeffs[1] << ',' << zCoeffs[2] << ',';
 
     // GET GRID SEARCH RANGE
-    grid_precision gridDiff = 1e-4f;
+    // grid_precision gridDiff = 1e-4f;
+    grid_precision gridDiff = 1.3f;
     grid_precision gridN = 11;
 
     std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2], 
