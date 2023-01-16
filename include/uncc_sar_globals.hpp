@@ -50,6 +50,9 @@ void cxxopts_integration(cxxopts::Options& options) {
 
     options.add_options()
             ("i,input", "Input file", cxxopts::value<std::string>())
+            ("m,multi", "Multiresolution Value", cxxopts::value<int>()->default_value("1"))
+            ("n,numPulse", "Number of pulses to focus", cxxopts::value<int>()->default_value("0"))
+            ("s,style", "Linear or Quadratic Calculation", cxxopts::value<int>()->default_value("0"))
             //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
             ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
             ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))

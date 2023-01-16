@@ -108,7 +108,7 @@ std::vector<__nTp> vectorAppendCumSum(__nTp start, std::vector<__nTp> values) {
 }
 
 template<typename __nTp>
-void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
+void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     // double sumX = 0.0;
     // double sumY = 0.0;
     // double N = values.size();
@@ -137,7 +137,7 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
     // coeffs[1] = tempa;
     // coeffs[2] = tempb;
 
-    int numN = values.size();
+    int numN = nPulse;
     double N = numN;
     double x1 = 0;
     double x2 = 0;
@@ -169,8 +169,8 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values) {
 }
 
 template<typename __nTp>
-void quadFit(__nTp* coeffs, std::vector<__nTp> values) {
-    int numN = values.size();
+void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
+    int numN = nPulse;
     double N = numN;
     double x1 = 0;
     double x2 = 0;
@@ -338,18 +338,18 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         // bestFit<NumericType>(xCoeffs, xPossDiff);
         // bestFit<NumericType>(yCoeffs, yPossDiff);
         // bestFit<NumericType>(zCoeffs, zPossDiff);
-        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data);
-        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data);
-        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data);
+        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
+        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
+        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
     }
     else{
         printf("Using Quadratic Model\n");
         // quadFit<NumericType>(xCoeffs, xPossDiff);
         // quadFit<NumericType>(yCoeffs, yPossDiff);
         // quadFit<NumericType>(zCoeffs, zPossDiff);
-        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data);
-        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data);
-        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data);
+        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
+        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
+        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
     }
 
     printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[0],xCoeffs[1],xCoeffs[2]);
@@ -554,6 +554,7 @@ int main(int argc, char **argv) {
     bool debug = result["debug"].as<bool>();
     int multiRes = result["multi"].as<int>();
     int style = result["style"].as<int>();
+    int nPulse = result["numPulse"].as<int>();
 
     initialize_Sandia_SPHRead(matlab_readvar_map);
     initialize_GOTCHA_MATRead(matlab_readvar_map);
@@ -656,6 +657,10 @@ int main(int argc, char **argv) {
 
     //    SAR_ImageFormationParameters<NumericType> SAR_image_params =
     //            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_focusing_data);
+
+    if(nPulse > 2) {
+        SAR_focusing_data.numAzimuthSamples = nPulse;
+    }
 
     std::cout << "Data for focusing" << std::endl;
     std::cout << SAR_focusing_data << std::endl;
