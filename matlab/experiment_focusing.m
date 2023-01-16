@@ -15,7 +15,10 @@ image_ref='';
 arg_multi_res='-m';
 mult_res='1';
 arg_style='-s';
-style_type='1'; % 0 = linear, 1 = quadratic
+style_type='0'; % 0 = linear, 1 = quadratic
+arg_num='-n';
+nPulses='30';
+nPulse=str2num(nPulses);
 
 estCoeff_list = [];
 estTrajx_list = [];
@@ -28,16 +31,17 @@ runtime_list = [];
 for fileIdx=1:length(imds_reference)
     time_start = tic;
     image_ref=imds_reference(fileIdx).name;
-    output_name = sprintf("OutputImages/%s_s_%s.bmp",image_ref,style_type);
+    output_name = sprintf("OutputImages/%s_style_%s_numPulses_%s.bmp",image_ref,style_type, nPulses);
     command=strcat(execute_binary," ", ...
         arg_reference_image," ",strcat("Data/",image_ref), " ", ...
         arg_multi_res, " ", mult_res, " ", ...
         arg_style, " ", style_type, " ", ...
+        arg_num, " ", nPulses, " ", ...
         "-o", " ", output_name)
     gt = load(strcat("Data/", image_ref));
-    gtx_list = [gtx_list; gt.data.x(1:117)];
-    gty_list = [gty_list; gt.data.y(1:117)];
-    gtz_list = [gtz_list; gt.data.z(1:117)];
+    gtx_list = [gtx_list; gt.data.x(1:nPulse)];
+    gty_list = [gty_list; gt.data.y(1:nPulse)];
+    gtz_list = [gtz_list; gt.data.z(1:nPulse)];
     [status,cmdout] = system(command);
     % add output of homography to cuGridSearch
     runtime = toc(time_start);
@@ -46,9 +50,9 @@ for fileIdx=1:length(imds_reference)
 %     estTrajx = cumsum([gt.data.x(1), estCoeff(1) * (1:116).^2 + estCoeff(2) * (1:116) + estCoeff(3)]);
 %     estTrajy = cumsum([gt.data.y(1), estCoeff(4) * (1:116).^2 + estCoeff(5) * (1:116) + estCoeff(6)]);
 %     estTrajz = cumsum([gt.data.z(1), estCoeff(7) * (1:116).^2 + estCoeff(8) * (1:116) + estCoeff(9)]);
-    estTrajx = estCoeff(1) * (1:117).^2 + estCoeff(2) * (1:117) + estCoeff(3);
-    estTrajy = estCoeff(4) * (1:117).^2 + estCoeff(5) * (1:117) + estCoeff(6);
-    estTrajz = estCoeff(7) * (1:117).^2 + estCoeff(8) * (1:117) + estCoeff(9);
+    estTrajx = estCoeff(1) * (1:nPulse).^2 + estCoeff(2) * (1:nPulse) + estCoeff(3);
+    estTrajy = estCoeff(4) * (1:nPulse).^2 + estCoeff(5) * (1:nPulse) + estCoeff(6);
+    estTrajz = estCoeff(7) * (1:nPulse).^2 + estCoeff(8) * (1:nPulse) + estCoeff(9);
     estCoeff_list = [estCoeff_list; estCoeff];
     estTrajx_list = [estTrajx_list; estTrajx];
     estTrajy_list = [estTrajy_list; estTrajy];
