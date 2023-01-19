@@ -40,13 +40,16 @@
 
 typedef float NumericType;
 
-#define grid_dimension 9        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension_quadratic 9        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension_linear 6        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+
 typedef float grid_precision;   // the type of values in the grid, e.g., float, double, int, etc.
 typedef float func_precision;   // the type of values taken by the error function, e.g., float, double, int, etc.
 typedef float pixel_precision; // the type of values in the image, e.g., float, double, int, etc.
 
-// // TODO: THIS WILL NEED TO BE CHANGED TO FIT THE ERROR FUNCTION (Look at changes to error function)
-typedef func_byvalue_t<func_precision, grid_precision, grid_dimension, 
+// TODO: THIS WILL NEED TO BE CHANGED TO FIT THE ERROR FUNCTION (Look at changes to error function)
+
+typedef func_byvalue_t<func_precision, grid_precision, grid_dimension_linear,
         cufftComplex*,
         int, int,
         NumericType, NumericType,
@@ -58,24 +61,26 @@ typedef func_byvalue_t<func_precision, grid_precision, grid_dimension,
         NumericType*,
         NumericType*,
         SAR_ImageFormationParameters<NumericType>*,
-        NumericType* > image_err_func_byvalue;
+        NumericType* > image_err_func_byvalue_linear;
 
-// // TODO: THIS WILL ALSO NEED TO BE CHANGED TO FIT THE ERROR FUNCTION
-__device__ image_err_func_byvalue dev_func_byvalue_ptr = kernelWrapper<func_precision, grid_precision, grid_dimension, NumericType>;
+typedef func_byvalue_t<func_precision, grid_precision, grid_dimension_quadratic,
+        cufftComplex*,
+        int, int,
+        NumericType, NumericType,
+        NumericType, NumericType,
+        NumericType, NumericType,
+        NumericType*,
+        NumericType*,
+        NumericType*,
+        NumericType*,
+        NumericType*,
+        SAR_ImageFormationParameters<NumericType>*,
+        NumericType* > image_err_func_byvalue_quadratic;
 
-pixel_precision imageA_data[6 * 6] = {0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0,
-                                      0, 0, 1, 1, 0, 0,
-                                      0, 0, 1, 1, 0, 0,
-                                      0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0};
+// TODO: THIS WILL ALSO NEED TO BE CHANGED TO FIT THE ERROR FUNCTION
+__device__ image_err_func_byvalue_linear dev_func_byvalue_ptr_linear = kernelWrapper<func_precision, grid_precision, grid_dimension_linear, NumericType>;
+__device__ image_err_func_byvalue_quadratic dev_func_byvalue_ptr_quadratic = kernelWrapper<func_precision, grid_precision, grid_dimension_quadratic, NumericType>;
 
-pixel_precision imageB_data[6 * 6] = {0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 0, 0,
-                                      0, 0, 0, 0, 1, 1,
-                                      0, 0, 0, 0, 1, 1};
 
 template<typename __nTp>
 std::vector<__nTp> vectorDiff(std::vector<__nTp> values) {
@@ -163,9 +168,8 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     float temp_a = (float)a;
     float temp_b = (float)b;
     printf("temp_a = %f\ntemp_b = %f\n", temp_a, temp_b);
-    coeffs[0] = 0;
+    coeffs[0] = temp_b;
     coeffs[1] = temp_a;
-    coeffs[2] = temp_b;
 }
 
 template<typename __nTp>
@@ -204,10 +208,9 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     float temp_b = (float)b;
     float temp_c = (float)c;
     
-    coeffs[0] = temp_a;
+    coeffs[0] = temp_c;
     coeffs[1] = temp_b;
-    coeffs[2] = temp_c;
-
+    coeffs[2] = temp_a;
 }
 
 // TODO: Need to work on setting up the grid search
@@ -300,80 +303,14 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
     c0 = clock();
 
-#if ZEROCOPY
-    /*
-        backprojection_loop << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
-                sar_data.numAzimuthSamples, sar_image_params.N_y_pix,
-                delta_x, delta_y, sar_data.numRangeSamples, 0, 0,
-                c__4_delta_freq, cuda_res.getDeviceMemPointer<float>("startF"),
-                left, bottom, cuda_res.getDeviceMemPointer<float4>("platform_positions"), 0, 0,
-                cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
-     */
-    backprojection_loop<__nTp> << <dimGrid, dimBlock>>>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"),
-            sar_data.numRangeSamples, sar_data.numAzimuthSamples,
-            delta_x_m_per_pix, delta_y_m_per_pix,
-            left_m, bottom_m, minRange, maxRange,
-            cuda_res.getDeviceMemPointer<__nTp>("Ant_x"),
-            cuda_res.getDeviceMemPointer<__nTp>("Ant_y"),
-            cuda_res.getDeviceMemPointer<__nTp>("Ant_z"),
-            cuda_res.getDeviceMemPointer<__nTp>("slant_range"),
-            cuda_res.getDeviceMemPointer<__nTp>("startF"),
-            cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params"),
-            cuda_res.getDeviceMemPointer<__nTp>("range_vec"),
-            cuda_res.getDeviceMemPointer<cufftComplex>("output_image"));
-#else
     // LINE FITTING BASED ON PULSE
-    float * xCoeffs = new float[3];
-    float * yCoeffs = new float[3];
-    float * zCoeffs = new float[3];
+    float *xCoeffs, *yCoeffs, *zCoeffs;
 
     // TODO: CHANGE PULSE NUMBERS, 10, 20, 30 for linear
 
     std::vector<NumericType> xPossDiff = vectorDiff(sar_data.Ant_x.data);
     std::vector<NumericType> yPossDiff = vectorDiff(sar_data.Ant_y.data);
     std::vector<NumericType> zPossDiff = vectorDiff(sar_data.Ant_z.data);
-
-    if(style == 0) {
-        printf("Using Linear Model\n");
-        // bestFit<NumericType>(xCoeffs, xPossDiff);
-        // bestFit<NumericType>(yCoeffs, yPossDiff);
-        // bestFit<NumericType>(zCoeffs, zPossDiff);
-        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
-        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
-        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
-    }
-    else{
-        printf("Using Quadratic Model\n");
-        // quadFit<NumericType>(xCoeffs, xPossDiff);
-        // quadFit<NumericType>(yCoeffs, yPossDiff);
-        // quadFit<NumericType>(zCoeffs, zPossDiff);
-        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
-        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
-        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
-    }
-
-    printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[0],xCoeffs[1],xCoeffs[2]);
-    printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[0],yCoeffs[1],yCoeffs[2]);
-    printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[0],zCoeffs[1],zCoeffs[2]);
-
-    *myfile << "gt," << xCoeffs[0] << ',' << xCoeffs[1] << ',' << xCoeffs[2] << ','
-                    << yCoeffs[0] << ',' << yCoeffs[1] << ',' << yCoeffs[2] << ','
-                    << zCoeffs[0] << ',' << zCoeffs[1] << ',' << zCoeffs[2] << ',';
-
-    // GET GRID SEARCH RANGE
-    // grid_precision gridDiff = 1e-4f;
-    grid_precision gridDiff = 1.3f;
-    grid_precision gridN = 11;
-
-    std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2], 
-                                               (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff, (grid_precision) yCoeffs[2],
-                                               (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2]};
-    std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff, (grid_precision) xCoeffs[2], 
-                                             (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff, (grid_precision) yCoeffs[2],
-                                             (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2]};
-    std::vector<grid_precision> grid_numSamples = {(grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                              (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                              (grid_precision)1, (grid_precision) gridN, (grid_precision) 1};
 
     // Put all of this outside the for loop
     int numRSamples = sar_data.numRangeSamples, numASamples = sar_data.numAzimuthSamples;
@@ -386,112 +323,268 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     SAR_ImageFormationParameters<__nTpParams>* sip_p = cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params");
     __nTp* rv_p = cuda_res.getDeviceMemPointer<__nTp>("range_vec");
     cufftComplex* oi_p = cuda_res.getDeviceMemPointer<cufftComplex>("output_image");
-
-    grid_precision testHolder[] = {xCoeffs[0], xCoeffs[1], yCoeffs[0], yCoeffs[1], zCoeffs[0], zCoeffs[1]};
-    nv_ext::Vec<grid_precision, grid_dimension> testHolderVec(testHolder);
-
-    image_err_func_byvalue host_func_byval_ptr;
-    // Copy device function pointer for the function having by-value parameters to host side
-    cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr,
-                        sizeof(image_err_func_byvalue));
-
     checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
+
+    // GET GRID SEARCH RANGE
+    // grid_precision gridDiff = 1e-4f;
+    grid_precision gridDiff = 1.3f;
+    grid_precision gridN = 11;
 
     float totalTime = 0;
 
-    grid_precision minParams[grid_dimension] = {0};
+    if(style == 0) {
+        printf("Using Linear Model\n");
+        xCoeffs = new float[2];
+        yCoeffs = new float[2];
+        zCoeffs = new float[2];
+        grid_precision minParams[grid_dimension_linear] = {0};
 
-    for(int iii = 0; iii < multiRes; iii++) {
-        CudaGrid<grid_precision, grid_dimension> grid;
-        ck(cudaMalloc(&grid.data(), grid.bytesSize()));
+        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
+        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
+        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
 
-        grid.setStartPoint(start_point);
-        grid.setEndPoint(end_point);
-        grid.setNumSamples(grid_numSamples);
-        grid.display("grid");
+        printf("X - Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[1],xCoeffs[0]);
+        printf("Y - Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[1],yCoeffs[0]);
+        printf("Z - Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[1],zCoeffs[0]);
 
-        grid_precision axis_sample_counts[grid_dimension];
-        grid.getAxisSampleCounts(axis_sample_counts);
+        *myfile << "gt," << xCoeffs[1] << ',' << xCoeffs[0] << ','
+                << yCoeffs[1] << ',' << yCoeffs[0] << ','
+                << zCoeffs[1] << ',' << zCoeffs[0] << ',';
 
-        CudaTensor<func_precision, grid_dimension> func_values(axis_sample_counts);
-        ck(cudaMalloc(&func_values._data, func_values.bytesSize()));
+        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff,
+                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff,
+                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff};
+        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff,
+                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff,
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff};
+        std::vector<grid_precision> grid_numSamples = {(grid_precision)gridN, (grid_precision) gridN,
+                                                       (grid_precision)gridN, (grid_precision) gridN,
+                                                       (grid_precision)gridN, (grid_precision) gridN};
+        image_err_func_byvalue_linear host_func_byval_ptr;
+        // Copy device function pointer for the function having by-value parameters to host side
+        cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_linear,
+                             sizeof(dev_func_byvalue_ptr_linear));
 
-        // first template argument is the error function return type
-        // second template argument is the grid point value type
-        CudaGridSearcher<func_precision, grid_precision, grid_dimension> gridsearcher(grid, func_values);
+        for(int iii = 0; iii < multiRes; iii++) {
+            CudaGrid<grid_precision, grid_dimension_linear> grid;
+            ck(cudaMalloc(&grid.data(), grid.bytesSize()));
 
-        c1 = clock();
-        gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
-        // gridsearcher.search_by_value(host_func_byval_ptr,
-                data_p,
-                numRSamples, numASamples,
-                delta_x_m_per_pix, delta_y_m_per_pix,
-                left_m, bottom_m, 
-                minRange, maxRange,
-                ax_p,
-                ay_p,
-                az_p,
-                sr_p,
-                sf_p,
-                sip_p,
-                rv_p);
-        c2 = clock();
-        float searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
-        printf("INFO: cuGridSearch took %f ms.\n", searchTime);
+            grid.setStartPoint(start_point);
+            grid.setEndPoint(end_point);
+            grid.setNumSamples(grid_numSamples);
+            grid.display("grid");
 
-        totalTime += searchTime;
+            grid_precision axis_sample_counts[grid_dimension_linear];
+            grid.getAxisSampleCounts(axis_sample_counts);
 
-        func_precision min_value;
-        int32_t min_value_index1d;
-        func_values.find_extrema(min_value, min_value_index1d);
-        
-        grid_precision min_grid_point[grid_dimension];
-        grid.getGridPoint(min_grid_point, min_value_index1d);
-        std::cout << "Minimum found at point p = { ";
-        for (int d=0; d < grid_dimension; d++) {
-            minParams[d] = min_grid_point[d];
-            std::cout << min_grid_point[d] << ((d < grid_dimension -1) ? ", " : " ");
+            CudaTensor<func_precision, grid_dimension_linear> func_values(axis_sample_counts);
+            ck(cudaMalloc(&func_values._data, func_values.bytesSize()));
 
-            start_point[d] = min_grid_point[d] - (end_point[d] - start_point[d]) / 4;
-            end_point[d] = min_grid_point[d] + (end_point[d] - start_point[d]) / 4;
-            // Update grid here or outside (basically somewhere near here)
+            // first template argument is the error function return type
+            // second template argument is the grid point value type
+            CudaGridSearcher<func_precision, grid_precision, grid_dimension_linear> gridsearcher(grid, func_values);
+
+            c1 = clock();
+            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+                    // gridsearcher.search_by_value(host_func_byval_ptr,
+                                                data_p,
+                                                numRSamples, numASamples,
+                                                delta_x_m_per_pix, delta_y_m_per_pix,
+                                                left_m, bottom_m,
+                                                minRange, maxRange,
+                                                ax_p,
+                                                ay_p,
+                                                az_p,
+                                                sr_p,
+                                                sf_p,
+                                                sip_p,
+                                                rv_p);
+            c2 = clock();
+            float searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
+            printf("INFO: cuGridSearch took %f ms.\n", searchTime);
+
+            totalTime += searchTime;
+
+            func_precision min_value;
+            int32_t min_value_index1d;
+            func_values.find_extrema(min_value, min_value_index1d);
+
+            grid_precision min_grid_point[grid_dimension_linear];
+            grid.getGridPoint(min_grid_point, min_value_index1d);
+            std::cout << "Minimum found at point p = { ";
+            for (int d=0; d < grid_dimension_linear; d++) {
+                minParams[d] = min_grid_point[d];
+                std::cout << min_grid_point[d] << ((d < grid_dimension_linear - 1) ? ", " : " ");
+
+                start_point[d] = min_grid_point[d] - (end_point[d] - start_point[d]) / 4;
+                end_point[d] = min_grid_point[d] + (end_point[d] - start_point[d]) / 4;
+                // Update grid here or outside (basically somewhere near here)
+            }
+            std::cout << "}" << std::endl;
+
+            ck(cudaFree(grid.data()));
+            ck(cudaFree(func_values.data()));
+
         }
-        std::cout << "}" << std::endl;
 
-        ck(cudaFree(grid.data()));
-        ck(cudaFree(func_values.data()));
+        printf("Total time took: %f\n", totalTime);
+        *myfile << "time," << totalTime << ',';
+
+        printf("MinParams[");
+        for(int d = 0; d < grid_dimension_linear; d++) {
+            printf("%e,", minParams[d]);
+        }
+        printf("]\n");
+
+        *myfile << "found,";
+        for(int i = 0; i < grid_dimension_linear; i++)
+            *myfile << minParams[i] << ',';
+
+        nv_ext::Vec<grid_precision, grid_dimension_linear> minParamsVec(minParams);
+        computeImageKernel<func_precision, grid_precision, grid_dimension_linear, __nTp><<<1,451>>>(minParamsVec,
+                                                                                                       data_p,
+                                                                                                       numRSamples, numASamples,
+                                                                                                       delta_x_m_per_pix, delta_y_m_per_pix,
+                                                                                                       left_m, bottom_m,
+                                                                                                       minRange, maxRange,
+                                                                                                       ax_p,
+                                                                                                       ay_p,
+                                                                                                       az_p,
+                                                                                                       sr_p,
+                                                                                                       sf_p,
+                                                                                                       sip_p,
+                                                                                                       rv_p,
+                                                                                                       oi_p);
+
+    } else {
+        printf("Using Quadratic Model\n");
+        xCoeffs = new float[3];
+        yCoeffs = new float[3];
+        zCoeffs = new float[3];
+        grid_precision minParams[grid_dimension_quadratic] = {0};
+
+        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
+        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
+        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
+
+        printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[2],xCoeffs[1],xCoeffs[0]);
+        printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[2],yCoeffs[1],yCoeffs[0]);
+        printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[2],zCoeffs[1],zCoeffs[0]);
+
+        *myfile << "gt," << xCoeffs[2] << ',' << xCoeffs[1] << ',' << xCoeffs[0] << ','
+                << yCoeffs[2] << ',' << yCoeffs[1] << ',' << yCoeffs[0] << ','
+                << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
+        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2],
+                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff, (grid_precision) yCoeffs[2],
+                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2]};
+        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff, (grid_precision) xCoeffs[2],
+                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff, (grid_precision) yCoeffs[2],
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2]};
+        std::vector<grid_precision> grid_numSamples = {(grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1};
+
+        image_err_func_byvalue_quadratic host_func_byval_ptr;
+        // Copy device function pointer for the function having by-value parameters to host side
+        cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_quadratic,
+                             sizeof(dev_func_byvalue_ptr_quadratic));
+
+        for(int iii = 0; iii < multiRes; iii++) {
+            CudaGrid<grid_precision, grid_dimension_quadratic> grid;
+            ck(cudaMalloc(&grid.data(), grid.bytesSize()));
+
+            grid.setStartPoint(start_point);
+            grid.setEndPoint(end_point);
+            grid.setNumSamples(grid_numSamples);
+            grid.display("grid");
+
+            grid_precision axis_sample_counts[grid_dimension_quadratic];
+            grid.getAxisSampleCounts(axis_sample_counts);
+
+            CudaTensor<func_precision, grid_dimension_quadratic> func_values(axis_sample_counts);
+            ck(cudaMalloc(&func_values._data, func_values.bytesSize()));
+
+            // first template argument is the error function return type
+            // second template argument is the grid point value type
+            CudaGridSearcher<func_precision, grid_precision, grid_dimension_quadratic> gridsearcher(grid, func_values);
+
+            c1 = clock();
+            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+                    // gridsearcher.search_by_value(host_func_byval_ptr,
+                                                data_p,
+                                                numRSamples, numASamples,
+                                                delta_x_m_per_pix, delta_y_m_per_pix,
+                                                left_m, bottom_m,
+                                                minRange, maxRange,
+                                                ax_p,
+                                                ay_p,
+                                                az_p,
+                                                sr_p,
+                                                sf_p,
+                                                sip_p,
+                                                rv_p);
+            c2 = clock();
+            float searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
+            printf("INFO: cuGridSearch took %f ms.\n", searchTime);
+
+            totalTime += searchTime;
+
+            func_precision min_value;
+            int32_t min_value_index1d;
+            func_values.find_extrema(min_value, min_value_index1d);
+
+            grid_precision min_grid_point[grid_dimension_quadratic];
+            grid.getGridPoint(min_grid_point, min_value_index1d);
+            std::cout << "Minimum found at point p = { ";
+            for (int d=0; d < grid_dimension_quadratic; d++) {
+                minParams[d] = min_grid_point[d];
+                std::cout << min_grid_point[d] << ((d < grid_dimension_quadratic - 1) ? ", " : " ");
+
+                start_point[d] = min_grid_point[d] - (end_point[d] - start_point[d]) / 4;
+                end_point[d] = min_grid_point[d] + (end_point[d] - start_point[d]) / 4;
+                // Update grid here or outside (basically somewhere near here)
+            }
+            std::cout << "}" << std::endl;
+
+            ck(cudaFree(grid.data()));
+            ck(cudaFree(func_values.data()));
+
+        }
+
+        printf("Total time took: %f\n", totalTime);
+        *myfile << "time," << totalTime << ',';
+
+        printf("MinParams[");
+        for(int d = 0; d < grid_dimension_quadratic; d++) {
+            printf("%e,", minParams[d]);
+        }
+        printf("]\n");
+
+        *myfile << "found,";
+        for(int i = 0; i < grid_dimension_quadratic; i++)
+            *myfile << minParams[i] << ',';
+
+        nv_ext::Vec<grid_precision, grid_dimension_quadratic> minParamsVec(minParams);
+        computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1,451>>>(minParamsVec,
+                                                                                                       data_p,
+                                                                                                       numRSamples, numASamples,
+                                                                                                       delta_x_m_per_pix, delta_y_m_per_pix,
+                                                                                                       left_m, bottom_m,
+                                                                                                       minRange, maxRange,
+                                                                                                       ax_p,
+                                                                                                       ay_p,
+                                                                                                       az_p,
+                                                                                                       sr_p,
+                                                                                                       sf_p,
+                                                                                                       sip_p,
+                                                                                                       rv_p,
+                                                                                                       oi_p);
 
     }
 
-    printf("Total time took: %f\n", totalTime);
-    *myfile << "time," << totalTime << ',';
+//    grid_precision testHolder[] = {xCoeffs[0], xCoeffs[1], yCoeffs[0], yCoeffs[1], zCoeffs[0], zCoeffs[1]};
+//    nv_ext::Vec<grid_precision, grid_dimension_quadratic> testHolderVec(testHolder);
 
-    printf("MinParams[");
-    for(int d = 0; d < grid_dimension; d++) {
-        printf("%e,", minParams[d]);
-    }
-    printf("]\n");
-
-    *myfile << "found,";
-    for(int i = 0; i < grid_dimension; i++)
-        *myfile << minParams[i] << ',';
-
-    nv_ext::Vec<grid_precision, grid_dimension> minParamsVec(minParams);
-    computeImageKernel<func_precision, grid_precision, grid_dimension, __nTp><<<1,451>>>(minParamsVec,
-            data_p,
-            numRSamples, numASamples,
-            delta_x_m_per_pix, delta_y_m_per_pix,
-            left_m, bottom_m, 
-            minRange, maxRange,
-            ax_p,
-            ay_p,
-            az_p,
-            sr_p,
-            sf_p,
-            sip_p,
-            rv_p,
-            oi_p);
-#endif
     /* NOTE: COMMENT IF GRID ONLY */
     c1 = clock();
     printf("INFO: CUDA Backprojection kernel launch took %f ms.\n", (float) (c1 - c0) * 1000 / CLOCKS_PER_SEC);
@@ -501,18 +594,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     printf("INFO: CUDA Backprojection execution took %f ms.\n", (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC);
     printf("INFO: CUDA Backprojection total time took %f ms.\n", (float) (c2 - c0) * 1000 / CLOCKS_PER_SEC);
     /**/
-#if ZEROCOPY
-    int num_img_bytes = sizeof (cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
-    std::vector<cufftComplex> image_data(sar_image_params.N_x_pix * sar_image_params.N_y_pix);
-    //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
-    cuda_res.copyFromZero("output_image", image_data.data(), num_img_bytes);
-    for (int idx = 0; idx < sar_image_params.N_x_pix * sar_image_params.N_y_pix; idx++) {
-        output_image[idx]._M_real = image_data[idx].x;
-        output_image[idx]._M_imag = image_data[idx].y;
-    }
-    //cuda_res.freeHostMemory("range_vec");
-    //from_gpu_complex_to_bp_complex_split(cuda_res.out_image, output_image, sar_image_params.N_x_pix * sar_image_params.N_y_pix);
-#else
+
     int num_img_bytes = sizeof (cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
     std::vector<cufftComplex> image_data(sar_image_params.N_x_pix * sar_image_params.N_y_pix);
     //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
@@ -522,12 +604,11 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         output_image[idx]._M_imag = image_data[idx].y;
     }
 
-#endif
     cuda_res.freeGPUMemory("range_vec");
 
-    delete xCoeffs;
-    delete yCoeffs;
-    delete zCoeffs;
+    delete[] xCoeffs;
+    delete[] yCoeffs;
+    delete[] zCoeffs;
 
     if (finalize_CUDAResources(sar_data, sar_image_params, cuda_res) == EXIT_FAILURE) {
         std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..." << std::endl;
