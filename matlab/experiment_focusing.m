@@ -115,7 +115,7 @@ for modelIdx=2:2
     end
 end
 
-dataset.date = date;
-experiment_filename_str = sprintf('sar_focusing_exp_results-%s.mat', dataset.date)
+dataset(1).date = date;
+experiment_filename_str = sprintf('sar_focusing_exp_results-%s.mat', dataset(1).date)
 save(experiment_filename_str,'dataset')
 
