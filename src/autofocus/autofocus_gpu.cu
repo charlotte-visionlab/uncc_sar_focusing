@@ -38,10 +38,16 @@
 
 #include "gridSearchErrorFunctions.cuh"
 
+#define EIGEN_DEFAULT_DENSE_INDEX_TYPE int
+#include <Eigen/Dense>
+
+#include <unsupported/Eigen/NonLinearOptimization>
+#include <unsupported/Eigen/NumericalDiff>
+
 typedef float NumericType;
 
-#define grid_dimension_quadratic 9        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
-#define grid_dimension_linear 6        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension_quadratic 10        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension_linear 7        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
 
 typedef float grid_precision;   // the type of values in the grid, e.g., float, double, int, etc.
 typedef float func_precision;   // the type of values taken by the error function, e.g., float, double, int, etc.
@@ -81,6 +87,180 @@ typedef func_byvalue_t<func_precision, grid_precision, grid_dimension_quadratic,
 __device__ image_err_func_byvalue_linear dev_func_byvalue_ptr_linear = kernelWrapper<func_precision, grid_precision, grid_dimension_linear, NumericType>;
 __device__ image_err_func_byvalue_quadratic dev_func_byvalue_ptr_quadratic = kernelWrapper<func_precision, grid_precision, grid_dimension_quadratic, NumericType>;
 
+// Generic functor
+template<typename _Scalar, int NX = Eigen::Dynamic, int NY = Eigen::Dynamic>
+struct Functor
+{
+    typedef _Scalar Scalar;
+    enum {
+        InputsAtCompileTime = NX,
+        ValuesAtCompileTime = NY
+    };
+    typedef Eigen::Matrix<Scalar,InputsAtCompileTime,1> InputType;
+    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,1> ValueType;
+    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,InputsAtCompileTime> JacobianType;
+
+    int m_inputs, m_values;
+
+    Functor() : m_inputs(InputsAtCompileTime), m_values(ValuesAtCompileTime) {}
+    Functor(int inputs, int values) : m_inputs(inputs), m_values(values) {}
+
+    int inputs() const { return m_inputs; }
+    int values() const { return m_values; }
+
+};
+
+template<typename _Scalar, int NX = Eigen::Dynamic, int NY = Eigen::Dynamic>
+struct PGAFunctor
+{
+    typedef _Scalar Scalar;
+    enum {
+        InputsAtCompileTime = NX,
+        ValuesAtCompileTime = NY
+    };
+    typedef Eigen::Matrix<Scalar,InputsAtCompileTime,1> InputType;
+    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,1> ValueType;
+    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,InputsAtCompileTime> JacobianType;
+
+    int m_inputs, m_values, numSamples, numRange;
+
+    PGAFunctor() : m_inputs(InputsAtCompileTime), m_values(ValuesAtCompileTime) {}
+    PGAFunctor(int inputs, int values) : m_inputs(inputs), m_values(values) {}
+
+    int inputs() const { return m_inputs; }
+    int values() const { return m_values; }
+
+    int operator()(const Eigen::VectorXcf &x, Eigen::VectorXf &fvec) const {
+        // Implement the ()
+        // Energy of the phase, all of the phase given the phase shift
+        // Python code up to phi (remove linear trend), try it with and without
+
+        cufftComplex* G_dot = new cufftComplex[numSamples*numRange]; // Holds the data difference
+        float* phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity// Store values into G_dot
+
+        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            for(int rangeNum = 0; rangeNum < numRange-1; rangeNum++) { // Because it's a difference
+                G_dot[rangeNum + pulseNum * numRange].x = x(rangeNum + pulseNum * numRange).real() - x(rangeNum + pulseNum * numRange + 1).real();
+                G_dot[rangeNum + pulseNum * numRange].y = x(rangeNum + pulseNum * numRange).imag() - x(rangeNum + pulseNum * numRange + 1).imag();
+            }
+            // To follow the python code where they append the final sample difference to the matrix to make the size the same as the original
+            G_dot[numRange-1 + pulseNum * numRange].x = G_dot[numRange-2 + pulseNum * numRange].x;
+            G_dot[numRange-1 + pulseNum * numRange].y = G_dot[numRange-2 + pulseNum * numRange].y;
+        }
+
+        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            float G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
+            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                phi_dot[pulseNum] += (x(idx).real() * G_dot[idx].y) + (-1*x(idx).imag() * G_dot[idx].x); // Only the imaginary component is needed
+                G_norm += sqrt(x(idx).real() * x(idx).real() + x(idx).imag() * x(idx).imag());
+            }
+            phi_dot[pulseNum] /= G_norm;
+        }
+        
+        for(int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum-1];
+        }
+
+        delete[] G_dot;
+        delete[] phi_dot;
+        return 0;
+    }
+
+    int df(const Eigen::VectorXcf &x, Eigen::MatrixXf &fjac) const {
+        for (int iii = 0; iii < x.size(); iii++ ) {
+            // Still need to figure out how x will look like (Array of complex vectors?)
+            float b = x(iii).imag(); // Something like this, .y or .imag()
+            fjac(0,iii) = b*b;
+        }
+        return 0;
+    }
+};
+
+template<typename func_precision, typename grid_precision, uint32_t D, typename __Tp>
+__global__ void lmKernelWrapper(nv_ext::Vec<grid_precision, D> parameters, cufftComplex *sampleData,
+                                        int numRangeSamples, int numAzimuthSamples,
+                                        __Tp delta_x_m_per_pix, __Tp delta_y_m_per_pix,
+                                        __Tp left, __Tp bottom,
+                                        __Tp rmin, __Tp rmax,
+                                        __Tp *Ant_x,
+                                        __Tp *Ant_y,
+                                        __Tp *Ant_z,
+                                        __Tp *slant_range,
+                                        __Tp *startF,
+                                        SAR_ImageFormationParameters<__Tp> *sar_image_params,
+                                        __Tp *range_vec,
+                                        func_precision *output) {
+                                            
+    *output = kernelWrapper<func_precision, grid_precision, D, NumericType>(parameters, sampleData, numRangeSamples, numAzimuthSamples, delta_x_m_per_pix, delta_y_m_per_pix, left, bottom, rmin, rmax, Ant_x, Ant_y, 
+            Ant_z, slant_range, startF, sar_image_params, range_vec);
+}
+
+int numRSamples_nl, numASamples_nl;
+cufftComplex* data_nl;
+NumericType* ax_nl;
+NumericType* ay_nl;
+NumericType* az_nl;
+NumericType* sr_nl;
+NumericType* sf_nl;
+SAR_ImageFormationParameters<NumericType>* sip_nl;
+NumericType* rv_nl;
+NumericType delta_x_m_per_pix_nl, delta_y_m_per_pix_nl, left_m_nl, bottom_m_nl, minRange_nl, maxRange_nl;
+
+struct my_functor : Functor<float>
+{
+    my_functor(void): Functor<float>(grid_dimension_quadratic,grid_dimension_quadratic) {}
+    int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const
+    {
+        // Plan A
+        /*
+        Make a separate Kernel that does the same logic as the grid search
+        Have it use a variable stored on a GPU for the output (kinda like output_image)
+        Move the variable back to CPU and assign it to fvec(0)
+        
+        Complexity: 
+        Making a kernalWrapper2 with different inputs
+        Assigning everything correctly
+        Assuming that this Eigen function runs sequentially
+        */
+
+        // Plan B
+        /*
+        Make a CPU version of the kernelWrapper code
+
+        Complexity:
+        Having to un-thread the kernelWrapper code and everything related to it
+        */
+
+        float minParams[grid_dimension_quadratic] = {0};
+        printf("Performing search on: ");
+        for (int i = 0; i < grid_dimension_quadratic; i++) {
+            printf("%f ", x(i));
+            minParams[i] = x(i);
+        }
+        printf("\n");
+        nv_ext::Vec<float, grid_dimension_quadratic> minParamsVec(minParams);
+        fvec(0) = 0;
+        func_precision output = 0;
+        func_precision *output_d;
+        cudaMalloc(&output_d, sizeof(func_precision));
+        lmKernelWrapper<func_precision, grid_precision, grid_dimension_quadratic, NumericType><<<1,451>>>(minParamsVec, 
+            data_nl, 
+            numRSamples_nl, numASamples_nl, 
+            delta_x_m_per_pix_nl, delta_y_m_per_pix_nl, 
+            left_m_nl, bottom_m_nl, 
+            minRange_nl, maxRange_nl,
+            ax_nl, ay_nl, az_nl, sr_nl, sf_nl, sip_nl, rv_nl, output_d);
+        cudaMemcpy(&output, output_d, sizeof(func_precision), cudaMemcpyDeviceToHost);
+        cudaFree(output_d);
+        // if (output < 33) output = 1e6f;
+        fvec(0) = output;
+        printf("Output for this search is: %f\n", output);
+        for (int i = 1; i < grid_dimension_quadratic; i++)
+            fvec(i) = 0;
+        return 0;
+    }
+};
 
 template<typename __nTp>
 std::vector<__nTp> vectorDiff(std::vector<__nTp> values) {
@@ -113,7 +293,7 @@ std::vector<__nTp> vectorAppendCumSum(__nTp start, std::vector<__nTp> values) {
 }
 
 template<typename __nTp>
-void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
+void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     // double sumX = 0.0;
     // double sumY = 0.0;
     // double N = values.size();
@@ -143,13 +323,14 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     // coeffs[2] = tempb;
 
     int numN = nPulse;
-    double N = numN;
+    double N = 0;
     double x1 = 0;
     double x2 = 0;
     double f0 = 0;
     double f1 = 0;
 
-    for (int i = 0; i < numN; i++) {
+    for (int i = 0; i < numN; i += skip) {
+        N += 1;
         x1 += i;
         x2 += i * i;
         f0 += values[i];
@@ -173,9 +354,9 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
 }
 
 template<typename __nTp>
-void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
+void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     int numN = nPulse;
-    double N = numN;
+    double N = 0;
     double x1 = 0;
     double x2 = 0;
     double x3 = 0;
@@ -184,7 +365,8 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     double f1 = 0;
     double f2 = 0;
 
-    for (int i = 0; i < numN; i++) {
+    for (int i = 0; i < numN; i+=skip) {
+        N += 1;
         x1 += i;
         x2 += i * i;
         x3 += i * i * i;
@@ -213,12 +395,67 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse) {
     coeffs[2] = temp_a;
 }
 
+// Alternative to the Levenburg Marquardt Algorithm (taking too long to debug, compile issues)
+// Currently going to be single thread for simplicity
+// Assumes data is already ift, shifted, and normed
+// TODO: Add dummy error to the data to check it
+__global__ void autofocus(cufftComplex *data, int numSamples, int numRange, int numIterations) {
+    // Samples are number of columns, range is the number of rows
+    // Data is column-major ordered
+
+    cufftComplex* G_dot = new cufftComplex[numSamples*numRange]; // Holds the data difference
+    float* phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity
+
+    for(int iii = 0; iii < numIterations; iii++) {
+        // Store values into G_dot
+        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            for(int rangeNum = 0; rangeNum < numRange-1; rangeNum++) { // Because it's a difference
+                G_dot[rangeNum + pulseNum * numRange].x = data[rangeNum + pulseNum * numRange].x - data[rangeNum + pulseNum * numRange + 1].x;
+                G_dot[rangeNum + pulseNum * numRange].y = data[rangeNum + pulseNum * numRange].y - data[rangeNum + pulseNum * numRange + 1].y;
+            }
+            // To follow the python code where they append the final sample difference to the matrix to make the size the same as the original
+            G_dot[numRange-1 + pulseNum * numRange].x = G_dot[numRange-2 + pulseNum * numRange].x;
+            G_dot[numRange-1 + pulseNum * numRange].y = G_dot[numRange-2 + pulseNum * numRange].y;
+        }
+
+        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            float G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
+            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                phi_dot[pulseNum] += (data[idx].x * G_dot[idx].y) + (-1*data[idx].y * G_dot[idx].x); // Only the imaginary component is needed
+                G_norm += sqrt(data[idx].x * data[idx].x + data[idx].y * data[idx].y);
+            }
+            phi_dot[pulseNum] /= G_norm;
+        }
+        
+        for(int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum-1];
+        }
+
+        // Don't know if removing the linar trend is needed, will check after applying the correction
+
+        // TODO: Need to figure out what's being done from the np.tile from the python code (mainly a mental visualization issue)
+        // Needed for the correction
+        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            Complex<float> tempExp(cos(phi_dot[pulseNum]), -1*sin(phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                data[idx].x = data[idx].x * tempExp.real() + data[idx].y * tempExp.imag();
+                data[idx].y = data[idx].x * tempExp.imag() + data[idx].y * tempExp.real();
+            }
+        }
+    }
+
+    delete[] G_dot;
+    delete[] phi_dot;
+}
+
 // TODO: Need to work on setting up the grid search
 
 template <typename __nTp, typename __nTpParams>
 void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
-        CArray<__nTp>& output_image, std::ofstream* myfile, int multiRes, int style) {
+        CArray<__nTp>& output_image, std::ofstream* myfile, int multiRes, int style, int pulseSkip) {
 
     switch (sar_image_params.algorithm) {
         case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
@@ -325,6 +562,23 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     cufftComplex* oi_p = cuda_res.getDeviceMemPointer<cufftComplex>("output_image");
     checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
 
+    numRSamples_nl = numRSamples;
+    numASamples_nl = numASamples;
+    data_nl = data_p;
+    ax_nl = ax_p;
+    ay_nl = ay_p;
+    az_nl = az_p;
+    sr_nl = sr_p;
+    sf_nl = sf_p;
+    sip_nl = sip_p;
+    rv_nl = rv_p;
+    delta_x_m_per_pix_nl = delta_x_m_per_pix;
+    delta_y_m_per_pix_nl = delta_y_m_per_pix;
+    left_m_nl = left_m;
+    bottom_m_nl = bottom_m;
+    minRange_nl = minRange;
+    maxRange_nl = maxRange;
+
     // GET GRID SEARCH RANGE
     // grid_precision gridDiff = 1e-4f;
     grid_precision gridDiff = 1.3f;
@@ -339,9 +593,9 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         zCoeffs = new float[2];
         grid_precision minParams[grid_dimension_linear] = {0};
 
-        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
-        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
-        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
+        bestFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples, pulseSkip);
+        bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples, pulseSkip);
+        bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples, pulseSkip);
 
         printf("X - Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[1],xCoeffs[0]);
         printf("Y - Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[1],yCoeffs[0]);
@@ -353,13 +607,16 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff,
-                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff};
+                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff,
+                                                   (grid_precision) 1};
         std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff,
                                                  (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff,
-                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff};
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff,
+                                                 (grid_precision) 4};
         std::vector<grid_precision> grid_numSamples = {(grid_precision)gridN, (grid_precision) gridN,
                                                        (grid_precision)gridN, (grid_precision) gridN,
-                                                       (grid_precision)gridN, (grid_precision) gridN};
+                                                       (grid_precision)gridN, (grid_precision) gridN,
+                                                       (grid_precision) 4};
         image_err_func_byvalue_linear host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
         cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_linear,
@@ -463,9 +720,9 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         zCoeffs = new float[3];
         grid_precision minParams[grid_dimension_quadratic] = {0};
 
-        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples);
-        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples);
-        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples);
+        quadFit<NumericType>(xCoeffs, sar_data.Ant_x.data, sar_data.numAzimuthSamples, pulseSkip);
+        quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples, pulseSkip);
+        quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples, pulseSkip);
 
         printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[2],xCoeffs[1],xCoeffs[0]);
         printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[2],yCoeffs[1],yCoeffs[0]);
@@ -476,13 +733,16 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
                 << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2],
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff, (grid_precision) yCoeffs[2],
-                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2]};
+                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2],
+                                                   (grid_precision) 1};
         std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff, (grid_precision) xCoeffs[2],
                                                  (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff, (grid_precision) yCoeffs[2],
-                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2]};
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2],
+                                                 (grid_precision) 4};
         std::vector<grid_precision> grid_numSamples = {(grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
                                                        (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1};
+                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision)4};
 
         image_err_func_byvalue_quadratic host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
@@ -564,6 +824,59 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         for(int i = 0; i < grid_dimension_quadratic; i++)
             *myfile << minParams[i] << ',';
 
+        // // Non-linear optimizer
+        // // By curve 
+        // Eigen::VectorXf x( grid_dimension_quadratic);
+        // for(int i = 0; i <  grid_dimension_quadratic; i++)
+        //     x(i) = minParams[i];
+        // std::cout << "x: " << x << std::endl;
+
+        // my_functor functor;
+        // Eigen::NumericalDiff<my_functor> numDiff(functor);
+        // Eigen::LevenbergMarquardt<Eigen::NumericalDiff<my_functor>,float> lm(numDiff);
+
+        // lm.parameters.maxfev = 2000;
+        // lm.parameters.xtol = 1.0e-10;
+
+        // int ret = lm.minimize(x);
+        // std::cout << "Iterations: " << lm.iter << ", Return code: " << ret << std::endl;
+
+        // std::cout << "x that minimizes the function: " << x << std::endl;
+
+        // // Place Found minimums to minParams
+        // for(int i = 0; i <  grid_dimension_quadratic; i++)
+        //     minParams[i] = x(i);
+
+//         // PGA
+//         // LM can't do complex numbers 
+//         /*
+//         In file included from /usr/include/c++/7/bits/char_traits.h:39:0,
+//                  from /usr/include/c++/7/ios:40,
+//                  from /usr/include/c++/7/ostream:38,
+//                  from /usr/include/c++/7/iostream:39,
+//                  from /home/grey/uncc_sar_focusing_gridSearch/cuGridSearch/src/cpu/cpuNonLinearOptimizer.cpp:4:
+// /usr/include/c++/7/bits/stl_algobase.h: In instantiation of ‘constexpr const _Tp& std::min(const _Tp&, const _Tp&) [with _Tp = std::complex<double>]’:
+// /usr/local/include/eigen3/unsupported/Eigen/src/NonLinearOptimization/LevenbergMarquardt.h:284:31:   required from ‘Eigen::LevenbergMarquardtSpace::Status Eigen::LevenbergMarquardt<FunctorType, Scalar>::minimizeOneStep(Eigen::LevenbergMarquardt<FunctorType, Scalar>::FVectorType&) [with FunctorType = Eigen::NumericalDiff<my_functor>; Scalar = std::complex<double>; Eigen::LevenbergMarquardt<FunctorType, Scalar>::FVectorType = Eigen::Matrix<std::complex<double>, -1, 1>]’
+// /usr/local/include/eigen3/unsupported/Eigen/src/NonLinearOptimization/LevenbergMarquardt.h:164:33:   required from ‘Eigen::LevenbergMarquardtSpace::Status Eigen::LevenbergMarquardt<FunctorType, Scalar>::minimize(Eigen::LevenbergMarquardt<FunctorType, Scalar>::FVectorType&) [with FunctorType = Eigen::NumericalDiff<my_functor>; Scalar = std::complex<double>; Eigen::LevenbergMarquardt<FunctorType, Scalar>::FVectorType = Eigen::Matrix<std::complex<double>, -1, 1>]’
+// /home/grey/uncc_sar_focusing_gridSearch/cuGridSearch/src/cpu/cpuNonLinearOptimizer.cpp:61:28:   required from here
+// /usr/include/c++/7/bits/stl_algobase.h:200:15: error: no match for ‘operator<’ (operand types are ‘const std::complex<double>’ and ‘const std::complex<double>’)
+//        if (__b < __a)
+//            ~~~~^~~~~
+//         */
+        // Eigen::VectorXcf xf(numASamples * numRSamples);
+        // PGAFunctor<std::complex<float>> pgaFunctor(numASamples*numRSamples, numASamples*numRSamples);
+        // cufftComplex* data_cpu_p = cuda_res.getHostMemPointer<cufftComplex>("sampleData");
+        // for(int i = 0; i < numASamples * numRSamples; i++) {
+        //     xf(i).real(data_cpu_p[i].x);
+        //     xf(i).imag(data_cpu_p[i].y);
+        // }   
+        // Eigen::LevenbergMarquardt<PGAFunctor<std::complex<float>>,float> lm(pgaFunctor);
+        // lm.parameters.maxfev = 2000;
+        // lm.parameters.xtol = 1.0e-10;
+
+        // int ret = lm.minimize(xf);
+        // std::cout << "Iterations: " << lm.iter << ", Return code: " << ret << std::endl;
+
         nv_ext::Vec<grid_precision, grid_dimension_quadratic> minParamsVec(minParams);
         computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1,451>>>(minParamsVec,
                                                                                                        data_p,
@@ -617,6 +930,24 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     std::cout << cuda_res << std::endl;
 }
 
+void cxxopts_integration_local(cxxopts::Options& options) {
+
+    options.add_options()
+            ("i,input", "Input file", cxxopts::value<std::string>())
+            ("k,pulseSkip", "Number of pulses to skip for estimation", cxxopts::value<int>()->default_value("1"))
+            ("m,multi", "Multiresolution Value", cxxopts::value<int>()->default_value("1"))
+            ("n,numPulse", "Number of pulses to focus", cxxopts::value<int>()->default_value("0"))
+            ("s,style", "Linear or Quadratic Calculation", cxxopts::value<int>()->default_value("0"))
+            //("f,format", "Data format {GOTCHA, Sandia, <auto>}", cxxopts::value<std::string>()->default_value("auto"))
+            ("p,polarity", "Polarity {HH,HV,VH,VV,<any>}", cxxopts::value<std::string>()->default_value("any"))
+            ("d,debug", "Enable debugging", cxxopts::value<bool>()->default_value("false"))
+            ("v,verbose", "Enable verbose output", cxxopts::value<bool>(verbose))
+            ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
+            ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
+            ("h,help", "Print usage")
+            ;
+}
+
 int main(int argc, char **argv) {
     ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
     ComplexType out[8];
@@ -624,7 +955,7 @@ int main(int argc, char **argv) {
     std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
 
     cxxopts::Options options("cpuBackProjection", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
-    cxxopts_integration(options);
+    cxxopts_integration_local(options);
 
     auto result = options.parse(argc, argv);
 
@@ -636,6 +967,7 @@ int main(int argc, char **argv) {
     int multiRes = result["multi"].as<int>();
     int style = result["style"].as<int>();
     int nPulse = result["numPulse"].as<int>();
+    int pulseSkip = result["pulseSkip"].as<int>();
 
     initialize_Sandia_SPHRead(matlab_readvar_map);
     initialize_GOTCHA_MATRead(matlab_readvar_map);
@@ -754,7 +1086,7 @@ int main(int argc, char **argv) {
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
     if (multiRes < 1) multiRes = 1;
-    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style);
+    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style, pulseSkip);
 
     // Required parameters for output generation manually overridden by command line arguments
     std::string output_filename = result["output"].as<std::string>();

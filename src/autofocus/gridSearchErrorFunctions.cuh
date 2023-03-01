@@ -187,7 +187,8 @@ cuCalculateColumnEntropy(const SAR_ImageFormationParameters<__nTp> *SARImgParams
     __syncthreads();
     if (threadIdx.x == 0) {
         for (int i = 0; i < 451; i++) {
-            tempEntropy += tempTempEntropy[i];
+            if(tempTempEntropy[i] == 0.0f) tempEntropy += 100.0f;
+            else tempEntropy += tempTempEntropy[i];
         }
     }
     __syncthreads();
@@ -212,22 +213,24 @@ __device__ func_precision kernelWrapper(nv_ext::Vec<grid_precision, D> &paramete
     unsigned int width = sar_image_params->N_x_pix, height = sar_image_params->N_y_pix;
     float output = 0;
 
+    __shared__ func_precision totalOut;
+
     cufftComplex output_image[424];
     __Tp Ant_x_new[119] = {0};
     __Tp Ant_y_new[119] = {0};
     __Tp Ant_z_new[119] = {0};
 
-    if (D == 9) {
+    if (D == 10) {
         for (int i = 0; i < numAzimuthSamples; i++) {
-            Ant_x_new[i] = parameters[2] * i * i + parameters[1] * i + parameters[0];
-            Ant_y_new[i] = parameters[5] * i * i + parameters[4] * i + parameters[3];
-            Ant_z_new[i] = parameters[8] * i * i + parameters[7] * i + parameters[6];
+            Ant_x_new[i] = parameters[2] * i * i + parameters[1] * i * parameters[9] + parameters[0];
+            Ant_y_new[i] = parameters[5] * i * i + parameters[4] * i * parameters[9] + parameters[3];
+            Ant_z_new[i] = parameters[8] * i * i + parameters[7] * i * parameters[9] + parameters[6];
         }
-    } else if (D == 6) {
+    } else if (D == 7) {
         for (int i = 0; i < numAzimuthSamples; i++) {
-            Ant_x_new[i] = parameters[1] * i + parameters[0];
-            Ant_y_new[i] = parameters[3] * i + parameters[2];
-            Ant_z_new[i] = parameters[5] * i + parameters[4];
+            Ant_x_new[i] = parameters[1] * i * parameters[6] + parameters[0];
+            Ant_y_new[i] = parameters[3] * i * parameters[6] + parameters[2];
+            Ant_z_new[i] = parameters[5] * i * parameters[6] + parameters[4];
         }
     }
 
@@ -245,13 +248,17 @@ __device__ func_precision kernelWrapper(nv_ext::Vec<grid_precision, D> &paramete
 
     output = cuCalculateColumnEntropy(sar_image_params, output_image);
     __syncthreads();
-
     if (threadIdx.x == 0) {
-        // For some reason if it's not printed out it returns 0
-        printf("%f\n", output);
-        return output;
-    } else
-        return 0;
+        totalOut = output;
+    }
+    __syncthreads();
+    return totalOut;
+    // if (threadIdx.x == 0) {
+    //     // For some reason if it's not printed out it returns 0
+    //     // printf("%f\n", output);
+    //     return output;
+    // } else
+    //     return 0;
 }
 
 template<typename func_precision, typename grid_precision, uint32_t D, typename __Tp>
@@ -276,17 +283,18 @@ __global__ void computeImageKernel(nv_ext::Vec<grid_precision, D> parameters,
     __Tp Ant_y_new[119];
     __Tp Ant_z_new[119];
 
-    if (D == 9) {
+    if (D == 10) {
+        // Keep the velocity between like 0.8 - 1.2
         for (int i = 0; i < numAzimuthSamples; i++) {
-            Ant_x_new[i] = parameters[2] * i * i + parameters[1] * i + parameters[0];
-            Ant_y_new[i] = parameters[5] * i * i + parameters[4] * i + parameters[3];
-            Ant_z_new[i] = parameters[8] * i * i + parameters[7] * i + parameters[6];
+            Ant_x_new[i] = parameters[2] * i * i + parameters[1] * i * parameters[9] + parameters[0];
+            Ant_y_new[i] = parameters[5] * i * i + parameters[4] * i * parameters[9] + parameters[3];
+            Ant_z_new[i] = parameters[8] * i * i + parameters[7] * i * parameters[9] + parameters[6];
         }
-    } else if (D == 6) {
+    } else if (D == 7) {
         for (int i = 0; i < numAzimuthSamples; i++) {
-            Ant_x_new[i] = parameters[1] * i + parameters[0];
-            Ant_y_new[i] = parameters[3] * i + parameters[2];
-            Ant_z_new[i] = parameters[5] * i + parameters[4];
+            Ant_x_new[i] = parameters[1] * i * parameters[6] + parameters[0];
+            Ant_y_new[i] = parameters[3] * i * parameters[6] + parameters[2];
+            Ant_z_new[i] = parameters[5] * i * parameters[6] + parameters[4];
         }
     }
 
