@@ -163,9 +163,9 @@ cuCalculateColumnEntropy(const SAR_ImageFormationParameters<__nTp> *SARImgParams
     }
     __syncthreads();
 
-    bool flipY = false;
-    bool flipX = true;
-    int srcIndex;
+//    bool flipY = false;
+//    bool flipX = true;
+//    int srcIndex;
     for (int y_dstIndex = 0; y_dstIndex < SARImgParams->N_y_pix; y_dstIndex++) {
         cufftComplex SARpixel = output_image[y_dstIndex];
         float pixelf = (float) (255.0 / SARImgParams->dyn_range_dB) *

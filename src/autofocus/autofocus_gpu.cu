@@ -46,7 +46,7 @@
 
 typedef float NumericType;
 
-#define grid_dimension_quadratic 10        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
+#define grid_dimension_quadratic 10    // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
 #define grid_dimension_linear 7        // the dimension of the grid, e.g., 1 => 1D grid, 2 => 2D grid, 3=> 3D grid, etc.
 
 typedef float grid_precision;   // the type of values in the grid, e.g., float, double, int, etc.
@@ -56,32 +56,32 @@ typedef float pixel_precision; // the type of values in the image, e.g., float, 
 // TODO: THIS WILL NEED TO BE CHANGED TO FIT THE ERROR FUNCTION (Look at changes to error function)
 
 typedef func_byvalue_t<func_precision, grid_precision, grid_dimension_linear,
-        cufftComplex*,
+        cufftComplex *,
         int, int,
         NumericType, NumericType,
         NumericType, NumericType,
         NumericType, NumericType,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        SAR_ImageFormationParameters<NumericType>*,
-        NumericType* > image_err_func_byvalue_linear;
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        SAR_ImageFormationParameters<NumericType> *,
+        NumericType *> image_err_func_byvalue_linear;
 
 typedef func_byvalue_t<func_precision, grid_precision, grid_dimension_quadratic,
-        cufftComplex*,
+        cufftComplex *,
         int, int,
         NumericType, NumericType,
         NumericType, NumericType,
         NumericType, NumericType,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        NumericType*,
-        SAR_ImageFormationParameters<NumericType>*,
-        NumericType* > image_err_func_byvalue_quadratic;
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        NumericType *,
+        SAR_ImageFormationParameters<NumericType> *,
+        NumericType *> image_err_func_byvalue_quadratic;
 
 // TODO: THIS WILL ALSO NEED TO BE CHANGED TO FIT THE ERROR FUNCTION
 __device__ image_err_func_byvalue_linear dev_func_byvalue_ptr_linear = kernelWrapper<func_precision, grid_precision, grid_dimension_linear, NumericType>;
@@ -89,45 +89,47 @@ __device__ image_err_func_byvalue_quadratic dev_func_byvalue_ptr_quadratic = ker
 
 // Generic functor
 template<typename _Scalar, int NX = Eigen::Dynamic, int NY = Eigen::Dynamic>
-struct Functor
-{
+struct Functor {
     typedef _Scalar Scalar;
     enum {
         InputsAtCompileTime = NX,
         ValuesAtCompileTime = NY
     };
-    typedef Eigen::Matrix<Scalar,InputsAtCompileTime,1> InputType;
-    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,1> ValueType;
-    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,InputsAtCompileTime> JacobianType;
+    typedef Eigen::Matrix<Scalar, InputsAtCompileTime, 1> InputType;
+    typedef Eigen::Matrix<Scalar, ValuesAtCompileTime, 1> ValueType;
+    typedef Eigen::Matrix <Scalar, ValuesAtCompileTime, InputsAtCompileTime> JacobianType;
 
     int m_inputs, m_values;
 
     Functor() : m_inputs(InputsAtCompileTime), m_values(ValuesAtCompileTime) {}
+
     Functor(int inputs, int values) : m_inputs(inputs), m_values(values) {}
 
     int inputs() const { return m_inputs; }
+
     int values() const { return m_values; }
 
 };
 
 template<typename _Scalar, int NX = Eigen::Dynamic, int NY = Eigen::Dynamic>
-struct PGAFunctor
-{
+struct PGAFunctor {
     typedef _Scalar Scalar;
     enum {
         InputsAtCompileTime = NX,
         ValuesAtCompileTime = NY
     };
-    typedef Eigen::Matrix<Scalar,InputsAtCompileTime,1> InputType;
-    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,1> ValueType;
-    typedef Eigen::Matrix<Scalar,ValuesAtCompileTime,InputsAtCompileTime> JacobianType;
+    typedef Eigen::Matrix<Scalar, InputsAtCompileTime, 1> InputType;
+    typedef Eigen::Matrix<Scalar, ValuesAtCompileTime, 1> ValueType;
+    typedef Eigen::Matrix <Scalar, ValuesAtCompileTime, InputsAtCompileTime> JacobianType;
 
     int m_inputs, m_values, numSamples, numRange;
 
     PGAFunctor() : m_inputs(InputsAtCompileTime), m_values(ValuesAtCompileTime) {}
+
     PGAFunctor(int inputs, int values) : m_inputs(inputs), m_values(values) {}
 
     int inputs() const { return m_inputs; }
+
     int values() const { return m_values; }
 
     int operator()(const Eigen::VectorXcf &x, Eigen::VectorXf &fvec) const {
@@ -135,31 +137,34 @@ struct PGAFunctor
         // Energy of the phase, all of the phase given the phase shift
         // Python code up to phi (remove linear trend), try it with and without
 
-        cufftComplex* G_dot = new cufftComplex[numSamples*numRange]; // Holds the data difference
-        float* phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity// Store values into G_dot
+        cufftComplex *G_dot = new cufftComplex[numSamples * numRange]; // Holds the data difference
+        float *phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity// Store values into G_dot
 
-        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
-            for(int rangeNum = 0; rangeNum < numRange-1; rangeNum++) { // Because it's a difference
-                G_dot[rangeNum + pulseNum * numRange].x = x(rangeNum + pulseNum * numRange).real() - x(rangeNum + pulseNum * numRange + 1).real();
-                G_dot[rangeNum + pulseNum * numRange].y = x(rangeNum + pulseNum * numRange).imag() - x(rangeNum + pulseNum * numRange + 1).imag();
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            for (int rangeNum = 0; rangeNum < numRange - 1; rangeNum++) { // Because it's a difference
+                G_dot[rangeNum + pulseNum * numRange].x =
+                        x(rangeNum + pulseNum * numRange).real() - x(rangeNum + pulseNum * numRange + 1).real();
+                G_dot[rangeNum + pulseNum * numRange].y =
+                        x(rangeNum + pulseNum * numRange).imag() - x(rangeNum + pulseNum * numRange + 1).imag();
             }
             // To follow the python code where they append the final sample difference to the matrix to make the size the same as the original
-            G_dot[numRange-1 + pulseNum * numRange].x = G_dot[numRange-2 + pulseNum * numRange].x;
-            G_dot[numRange-1 + pulseNum * numRange].y = G_dot[numRange-2 + pulseNum * numRange].y;
+            G_dot[numRange - 1 + pulseNum * numRange].x = G_dot[numRange - 2 + pulseNum * numRange].x;
+            G_dot[numRange - 1 + pulseNum * numRange].y = G_dot[numRange - 2 + pulseNum * numRange].y;
         }
 
-        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
             float G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
-            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
                 int idx = rangeNum + pulseNum * numRange;
-                phi_dot[pulseNum] += (x(idx).real() * G_dot[idx].y) + (-1*x(idx).imag() * G_dot[idx].x); // Only the imaginary component is needed
+                phi_dot[pulseNum] += (x(idx).real() * G_dot[idx].y) +
+                                     (-1 * x(idx).imag() * G_dot[idx].x); // Only the imaginary component is needed
                 G_norm += sqrt(x(idx).real() * x(idx).real() + x(idx).imag() * x(idx).imag());
             }
             phi_dot[pulseNum] /= G_norm;
         }
-        
-        for(int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
-            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum-1];
+
+        for (int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum - 1];
         }
 
         delete[] G_dot;
@@ -168,10 +173,10 @@ struct PGAFunctor
     }
 
     int df(const Eigen::VectorXcf &x, Eigen::MatrixXf &fjac) const {
-        for (int iii = 0; iii < x.size(); iii++ ) {
+        for (int iii = 0; iii < x.size(); iii++) {
             // Still need to figure out how x will look like (Array of complex vectors?)
             float b = x(iii).imag(); // Something like this, .y or .imag()
-            fjac(0,iii) = b*b;
+            fjac(0, iii) = b * b;
         }
         return 0;
     }
@@ -179,39 +184,42 @@ struct PGAFunctor
 
 template<typename func_precision, typename grid_precision, uint32_t D, typename __Tp>
 __global__ void lmKernelWrapper(nv_ext::Vec<grid_precision, D> parameters, cufftComplex *sampleData,
-                                        int numRangeSamples, int numAzimuthSamples,
-                                        __Tp delta_x_m_per_pix, __Tp delta_y_m_per_pix,
-                                        __Tp left, __Tp bottom,
-                                        __Tp rmin, __Tp rmax,
-                                        __Tp *Ant_x,
-                                        __Tp *Ant_y,
-                                        __Tp *Ant_z,
-                                        __Tp *slant_range,
-                                        __Tp *startF,
-                                        SAR_ImageFormationParameters<__Tp> *sar_image_params,
-                                        __Tp *range_vec,
-                                        func_precision *output) {
-                                            
-    *output = kernelWrapper<func_precision, grid_precision, D, NumericType>(parameters, sampleData, numRangeSamples, numAzimuthSamples, delta_x_m_per_pix, delta_y_m_per_pix, left, bottom, rmin, rmax, Ant_x, Ant_y, 
-            Ant_z, slant_range, startF, sar_image_params, range_vec);
+                                int numRangeSamples, int numAzimuthSamples,
+                                __Tp delta_x_m_per_pix, __Tp delta_y_m_per_pix,
+                                __Tp left, __Tp bottom,
+                                __Tp rmin, __Tp rmax,
+                                __Tp *Ant_x,
+                                __Tp *Ant_y,
+                                __Tp *Ant_z,
+                                __Tp *slant_range,
+                                __Tp *startF,
+                                SAR_ImageFormationParameters<__Tp> *sar_image_params,
+                                __Tp *range_vec,
+                                func_precision *output) {
+
+    *output = kernelWrapper<func_precision, grid_precision, D, NumericType>(parameters, sampleData, numRangeSamples,
+                                                                            numAzimuthSamples, delta_x_m_per_pix,
+                                                                            delta_y_m_per_pix, left, bottom, rmin, rmax,
+                                                                            Ant_x, Ant_y,
+                                                                            Ant_z, slant_range, startF,
+                                                                            sar_image_params, range_vec);
 }
 
 int numRSamples_nl, numASamples_nl;
-cufftComplex* data_nl;
-NumericType* ax_nl;
-NumericType* ay_nl;
-NumericType* az_nl;
-NumericType* sr_nl;
-NumericType* sf_nl;
-SAR_ImageFormationParameters<NumericType>* sip_nl;
-NumericType* rv_nl;
+cufftComplex *data_nl;
+NumericType *ax_nl;
+NumericType *ay_nl;
+NumericType *az_nl;
+NumericType *sr_nl;
+NumericType *sf_nl;
+SAR_ImageFormationParameters<NumericType> *sip_nl;
+NumericType *rv_nl;
 NumericType delta_x_m_per_pix_nl, delta_y_m_per_pix_nl, left_m_nl, bottom_m_nl, minRange_nl, maxRange_nl;
 
-struct my_functor : Functor<float>
-{
-    my_functor(void): Functor<float>(grid_dimension_quadratic,grid_dimension_quadratic) {}
-    int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const
-    {
+struct my_functor : Functor<float> {
+    my_functor(void) : Functor<float>(grid_dimension_quadratic, grid_dimension_quadratic) {}
+
+    int operator()(const Eigen::VectorXf &x, Eigen::VectorXf &fvec) const {
         // Plan A
         /*
         Make a separate Kernel that does the same logic as the grid search
@@ -244,13 +252,22 @@ struct my_functor : Functor<float>
         func_precision output = 0;
         func_precision *output_d;
         cudaMalloc(&output_d, sizeof(func_precision));
-        lmKernelWrapper<func_precision, grid_precision, grid_dimension_quadratic, NumericType><<<1,451>>>(minParamsVec, 
-            data_nl, 
-            numRSamples_nl, numASamples_nl, 
-            delta_x_m_per_pix_nl, delta_y_m_per_pix_nl, 
-            left_m_nl, bottom_m_nl, 
-            minRange_nl, maxRange_nl,
-            ax_nl, ay_nl, az_nl, sr_nl, sf_nl, sip_nl, rv_nl, output_d);
+        lmKernelWrapper<func_precision, grid_precision, grid_dimension_quadratic, NumericType><<<1, 451>>>(minParamsVec,
+                                                                                                           data_nl,
+                                                                                                           numRSamples_nl,
+                                                                                                           numASamples_nl,
+                                                                                                           delta_x_m_per_pix_nl,
+                                                                                                           delta_y_m_per_pix_nl,
+                                                                                                           left_m_nl,
+                                                                                                           bottom_m_nl,
+                                                                                                           minRange_nl,
+                                                                                                           maxRange_nl,
+                                                                                                           ax_nl, ay_nl,
+                                                                                                           az_nl, sr_nl,
+                                                                                                           sf_nl,
+                                                                                                           sip_nl,
+                                                                                                           rv_nl,
+                                                                                                           output_d);
         cudaMemcpy(&output, output_d, sizeof(func_precision), cudaMemcpyDeviceToHost);
         cudaFree(output_d);
         // if (output < 33) output = 1e6f;
@@ -265,8 +282,8 @@ struct my_functor : Functor<float>
 template<typename __nTp>
 std::vector<__nTp> vectorDiff(std::vector<__nTp> values) {
     std::vector<__nTp> temp;
-    for (int i = 0; i < values.size()-1; i++)
-        temp.push_back(values[i+1] - values[i]);
+    for (int i = 0; i < values.size() - 1; i++)
+        temp.push_back(values[i + 1] - values[i]);
 
     return temp;
 }
@@ -274,8 +291,8 @@ std::vector<__nTp> vectorDiff(std::vector<__nTp> values) {
 template<typename __nTp>
 std::vector<__nTp> generateDiffEstimate(__nTp slope, __nTp constant, int N) {
     std::vector<__nTp> temp;
-    for(int i = 0; i < N; i++)
-        temp.push_back(slope*i+constant);
+    for (int i = 0; i < N; i++)
+        temp.push_back(slope * i + constant);
     return temp;
 }
 
@@ -284,7 +301,7 @@ std::vector<__nTp> vectorAppendCumSum(__nTp start, std::vector<__nTp> values) {
     std::vector<__nTp> temp;
     __nTp sum = start;
     temp.push_back(start);
-    for (int i = 0; i < values.size(); i++){
+    for (int i = 0; i < values.size(); i++) {
         sum += values[i];
         temp.push_back(sum);
     }
@@ -293,7 +310,7 @@ std::vector<__nTp> vectorAppendCumSum(__nTp start, std::vector<__nTp> values) {
 }
 
 template<typename __nTp>
-void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
+void bestFit(__nTp *coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     // double sumX = 0.0;
     // double sumY = 0.0;
     // double N = values.size();
@@ -311,7 +328,7 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     // double den = N * sumXX - sumX * sumX;
 
     // double numC = sumY * sumXX - sumX * sumXY;
-    
+
     // double temp1 = numS/den;
     // double temp2 = numC/den;
 
@@ -346,15 +363,15 @@ void bestFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     a /= D;
     b /= D;
     printf("a1 = %f\nb2 = %f\n", a, b);
-    float temp_a = (float)a;
-    float temp_b = (float)b;
+    float temp_a = (float) a;
+    float temp_b = (float) b;
     printf("temp_a = %f\ntemp_b = %f\n", temp_a, temp_b);
     coeffs[0] = temp_b;
     coeffs[1] = temp_a;
 }
 
 template<typename __nTp>
-void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
+void quadFit(__nTp *coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     int numN = nPulse;
     double N = 0;
     double x1 = 0;
@@ -365,7 +382,7 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     double f1 = 0;
     double f2 = 0;
 
-    for (int i = 0; i < numN; i+=skip) {
+    for (int i = 0; i < numN; i += skip) {
         N += 1;
         x1 += i;
         x2 += i * i;
@@ -379,17 +396,17 @@ void quadFit(__nTp* coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     double D = x4 * x1 * x1 - 2 * x1 * x2 * x3 + x2 * x2 * x2 - N * x4 * x2 + N * x3 * x3;
 
     double a = f2 * x1 * x1 - f1 * x1 * x2 - f0 * x3 * x1 + f0 * x2 * x2 - N * f2 * x2 + N * f1 * x3;
-    double b = f1 * x2 * x2 - N * f1 *x4 + N * f2 * x3 + f0 * x1 * x4 - f0 * x2 * x3 - f2 * x1 * x2;
+    double b = f1 * x2 * x2 - N * f1 * x4 + N * f2 * x3 + f0 * x1 * x4 - f0 * x2 * x3 - f2 * x1 * x2;
     double c = f2 * x2 * x2 - f1 * x2 * x3 - f0 * x4 * x2 + f0 * x3 * x3 - f2 * x1 * x3 + f1 * x1 * x4;
 
     a /= D;
     b /= D;
     c /= D;
 
-    float temp_a = (float)a;
-    float temp_b = (float)b;
-    float temp_c = (float)c;
-    
+    float temp_a = (float) a;
+    float temp_b = (float) b;
+    float temp_c = (float) c;
+
     coeffs[0] = temp_c;
     coeffs[1] = temp_b;
     coeffs[2] = temp_a;
@@ -403,42 +420,46 @@ __global__ void autofocus(cufftComplex *data, int numSamples, int numRange, int 
     // Samples are number of columns, range is the number of rows
     // Data is column-major ordered
 
-    cufftComplex* G_dot = new cufftComplex[numSamples*numRange]; // Holds the data difference
-    float* phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity
+    cufftComplex *G_dot = new cufftComplex[numSamples * numRange]; // Holds the data difference
+    float *phi_dot = new float[numSamples]; // Holds phi_dot and will also hold phi for simplicity
 
-    for(int iii = 0; iii < numIterations; iii++) {
+    for (int iii = 0; iii < numIterations; iii++) {
         // Store values into G_dot
-        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
-            for(int rangeNum = 0; rangeNum < numRange-1; rangeNum++) { // Because it's a difference
-                G_dot[rangeNum + pulseNum * numRange].x = data[rangeNum + pulseNum * numRange].x - data[rangeNum + pulseNum * numRange + 1].x;
-                G_dot[rangeNum + pulseNum * numRange].y = data[rangeNum + pulseNum * numRange].y - data[rangeNum + pulseNum * numRange + 1].y;
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            for (int rangeNum = 0; rangeNum < numRange - 1; rangeNum++) { // Because it's a difference
+                G_dot[rangeNum + pulseNum * numRange].x =
+                        data[rangeNum + pulseNum * numRange].x - data[rangeNum + pulseNum * numRange + 1].x;
+                G_dot[rangeNum + pulseNum * numRange].y =
+                        data[rangeNum + pulseNum * numRange].y - data[rangeNum + pulseNum * numRange + 1].y;
             }
             // To follow the python code where they append the final sample difference to the matrix to make the size the same as the original
-            G_dot[numRange-1 + pulseNum * numRange].x = G_dot[numRange-2 + pulseNum * numRange].x;
-            G_dot[numRange-1 + pulseNum * numRange].y = G_dot[numRange-2 + pulseNum * numRange].y;
+            G_dot[numRange - 1 + pulseNum * numRange].x = G_dot[numRange - 2 + pulseNum * numRange].x;
+            G_dot[numRange - 1 + pulseNum * numRange].y = G_dot[numRange - 2 + pulseNum * numRange].y;
         }
 
-        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
             float G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
-            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
                 int idx = rangeNum + pulseNum * numRange;
-                phi_dot[pulseNum] += (data[idx].x * G_dot[idx].y) + (-1*data[idx].y * G_dot[idx].x); // Only the imaginary component is needed
+                phi_dot[pulseNum] += (data[idx].x * G_dot[idx].y) +
+                                     (-1 * data[idx].y * G_dot[idx].x); // Only the imaginary component is needed
                 G_norm += sqrt(data[idx].x * data[idx].x + data[idx].y * data[idx].y);
             }
             phi_dot[pulseNum] /= G_norm;
         }
-        
-        for(int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
-            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum-1];
+
+        for (int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            phi_dot[pulseNum] = phi_dot[pulseNum] + phi_dot[pulseNum - 1];
         }
 
         // Don't know if removing the linar trend is needed, will check after applying the correction
 
         // TODO: Need to figure out what's being done from the np.tile from the python code (mainly a mental visualization issue)
         // Needed for the correction
-        for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
-            Complex<float> tempExp(cos(phi_dot[pulseNum]), -1*sin(phi_dot[pulseNum])); // Something to represent e^(-j*phi)
-            for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            Complex<float> tempExp(cos(phi_dot[pulseNum]),
+                                   -1 * sin(phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
                 int idx = rangeNum + pulseNum * numRange;
                 data[idx].x = data[idx].x * tempExp.real() + data[idx].y * tempExp.imag();
                 data[idx].y = data[idx].x * tempExp.imag() + data[idx].y * tempExp.real();
@@ -452,10 +473,11 @@ __global__ void autofocus(cufftComplex *data, int numSamples, int numRange, int 
 
 // TODO: Need to work on setting up the grid search
 
-template <typename __nTp, typename __nTpParams>
-void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
-        const SAR_ImageFormationParameters<__nTpParams>& sar_image_params,
-        CArray<__nTp>& output_image, std::ofstream* myfile, int multiRes, int style, int pulseSkip) {
+template<typename __nTp, typename __nTpParams>
+void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
+                               const SAR_ImageFormationParameters<__nTpParams> &sar_image_params,
+                               CArray<__nTp> &output_image, std::ofstream *myfile, int multiRes, int style,
+                               int pulseSkip) {
 
     switch (sar_image_params.algorithm) {
         case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
@@ -472,10 +494,12 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     }
 
     // Display maximum scene size and resolution
-    std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << sar_image_params.max_Wy_m << " m range, "
-            << sar_image_params.max_Wx_m << " m cross-range" << std::endl;
-    std::cout << "Maximum Resolution:  " << std::fixed << std::setprecision(2) << sar_image_params.slant_rangeResolution << "m range, "
-            << sar_image_params.azimuthResolution << " m cross-range" << std::endl;
+    std::cout << "Maximum Scene Size:  " << std::fixed << std::setprecision(2) << sar_image_params.max_Wy_m
+              << " m range, "
+              << sar_image_params.max_Wx_m << " m cross-range" << std::endl;
+    std::cout << "Maximum Resolution:  " << std::fixed << std::setprecision(2) << sar_image_params.slant_rangeResolution
+              << "m range, "
+              << sar_image_params.azimuthResolution << " m cross-range" << std::endl;
     GPUMemoryManager cuda_res;
 
     if (initialize_GPUMATLAB(cuda_res.deviceId) == EXIT_FAILURE) {
@@ -493,7 +517,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     range_bin_data.rangeBins.shape.push_back(sar_image_params.N_fft);
     range_bin_data.rangeBins.shape.push_back(1);
     range_bin_data.rangeBins.data.resize(sar_image_params.N_fft);
-    __nTp* rangeBins = &range_bin_data.rangeBins.data[0]; //[sar_image_params.N_fft];
+    __nTp *rangeBins = &range_bin_data.rangeBins.data[0]; //[sar_image_params.N_fft];
     __nTp minRange = range_bin_data.minRange;
     __nTp maxRange = range_bin_data.maxRange;
 
@@ -513,7 +537,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     }
 
     cuda_res.copyToDevice("range_vec", (void *) &range_bin_data.rangeBins.data[0],
-            range_bin_data.rangeBins.data.size() * sizeof (range_bin_data.rangeBins.data[0]));
+                          range_bin_data.rangeBins.data.size() * sizeof(range_bin_data.rangeBins.data[0]));
 
     std::cout << cuda_res << std::endl;
     int numSamples = sar_data.sampleData.data.size();
@@ -523,9 +547,12 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     c0 = clock();
     //std::cout << printf("N_fft: %d, numAzimuthSamples: %d, numSamples: %d\n\n",sar_image_params.N_fft, sar_data.numAzimuthSamples, newSize);
-    cuifft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
-    cufftNormalize_1DBatch(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
-    cufftShift_1DBatch<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft, sar_data.numAzimuthSamples);
+    cuifft(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft,
+           sar_data.numAzimuthSamples);
+    cufftNormalize_1DBatch(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft,
+                           sar_data.numAzimuthSamples);
+    cufftShift_1DBatch<cufftComplex>(cuda_res.getDeviceMemPointer<cufftComplex>("sampleData"), sar_image_params.N_fft,
+                                     sar_data.numAzimuthSamples);
     c1 = clock();
     printf("INFO: CUDA FFT kernels took %f ms.\n", (float) (c1 - c0) * 1000 / CLOCKS_PER_SEC);
 
@@ -537,7 +564,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     // Set up and run the kernel
     dim3 dimBlock(cuda_res.blockwidth, cuda_res.blockheight, 1);
     dim3 dimGrid(std::ceil((float) sar_image_params.N_x_pix / cuda_res.blockwidth),
-            std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
+    std::ceil((float) sar_image_params.N_y_pix / cuda_res.blockheight));
     c0 = clock();
 
     // LINE FITTING BASED ON PULSE
@@ -551,15 +578,16 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     // Put all of this outside the for loop
     int numRSamples = sar_data.numRangeSamples, numASamples = sar_data.numAzimuthSamples;
-    cufftComplex* data_p = cuda_res.getDeviceMemPointer<cufftComplex>("sampleData");
-    __nTp* ax_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_x");
-    __nTp* ay_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_y");
-    __nTp* az_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_z");
-    __nTp* sr_p = cuda_res.getDeviceMemPointer<__nTp>("slant_range");
-    __nTp* sf_p = cuda_res.getDeviceMemPointer<__nTp>("startF");
-    SAR_ImageFormationParameters<__nTpParams>* sip_p = cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters < __nTpParams >> ("sar_image_params");
-    __nTp* rv_p = cuda_res.getDeviceMemPointer<__nTp>("range_vec");
-    cufftComplex* oi_p = cuda_res.getDeviceMemPointer<cufftComplex>("output_image");
+    cufftComplex *data_p = cuda_res.getDeviceMemPointer<cufftComplex>("sampleData");
+    __nTp *ax_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_x");
+    __nTp *ay_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_y");
+    __nTp *az_p = cuda_res.getDeviceMemPointer<__nTp>("Ant_z");
+    __nTp *sr_p = cuda_res.getDeviceMemPointer<__nTp>("slant_range");
+    __nTp *sf_p = cuda_res.getDeviceMemPointer<__nTp>("startF");
+    SAR_ImageFormationParameters<__nTpParams> *sip_p = cuda_res.getDeviceMemPointer<SAR_ImageFormationParameters<__nTpParams >>(
+            "sar_image_params");
+    __nTp *rv_p = cuda_res.getDeviceMemPointer<__nTp>("range_vec");
+    cufftComplex *oi_p = cuda_res.getDeviceMemPointer<cufftComplex>("output_image");
     checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
 
     numRSamples_nl = numRSamples;
@@ -586,7 +614,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
 
     float totalTime = 0;
 
-    if(style == 0) {
+    if (style == 0) {
         printf("Using Linear Model\n");
         xCoeffs = new float[2];
         yCoeffs = new float[2];
@@ -597,32 +625,32 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         bestFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples, pulseSkip);
         bestFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples, pulseSkip);
 
-        printf("X - Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[1],xCoeffs[0]);
-        printf("Y - Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[1],yCoeffs[0]);
-        printf("Z - Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[1],zCoeffs[0]);
+        printf("X - Slope coeff = %f\n    Const coeff = %f\n", xCoeffs[1], xCoeffs[0]);
+        printf("Y - Slope coeff = %f\n    Const coeff = %f\n", yCoeffs[1], yCoeffs[0]);
+        printf("Z - Slope coeff = %f\n    Const coeff = %f\n", zCoeffs[1], zCoeffs[0]);
 
         *myfile << "gt," << xCoeffs[1] << ',' << xCoeffs[0] << ','
                 << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[1] << ',' << zCoeffs[0] << ',';
 
-        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff,
-                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff,
-                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff,
+        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
+                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
+                                                   (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
                                                    (grid_precision) 1};
-        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff,
-                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff,
-                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff,
+        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,
+                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,
                                                  (grid_precision) 4};
-        std::vector<grid_precision> grid_numSamples = {(grid_precision)gridN, (grid_precision) gridN,
-                                                       (grid_precision)gridN, (grid_precision) gridN,
-                                                       (grid_precision)gridN, (grid_precision) gridN,
+        std::vector<grid_precision> grid_numSamples = {(grid_precision) gridN, (grid_precision) gridN,
+                                                       (grid_precision) gridN, (grid_precision) gridN,
+                                                       (grid_precision) gridN, (grid_precision) gridN,
                                                        (grid_precision) 4};
         image_err_func_byvalue_linear host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
         cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_linear,
                              sizeof(dev_func_byvalue_ptr_linear));
 
-        for(int iii = 0; iii < multiRes; iii++) {
+        for (int iii = 0; iii < multiRes; iii++) {
             CudaGrid<grid_precision, grid_dimension_linear> grid;
             ck(cudaMalloc(&grid.data(), grid.bytesSize()));
 
@@ -669,7 +697,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             grid_precision min_grid_point[grid_dimension_linear];
             grid.getGridPoint(min_grid_point, min_value_index1d);
             std::cout << "Minimum found at point p = { ";
-            for (int d=0; d < grid_dimension_linear; d++) {
+            for (int d = 0; d < grid_dimension_linear; d++) {
                 minParams[d] = min_grid_point[d];
                 std::cout << min_grid_point[d] << ((d < grid_dimension_linear - 1) ? ", " : " ");
 
@@ -688,30 +716,32 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         *myfile << "time," << totalTime << ',';
 
         printf("MinParams[");
-        for(int d = 0; d < grid_dimension_linear; d++) {
+        for (int d = 0; d < grid_dimension_linear; d++) {
             printf("%e,", minParams[d]);
         }
         printf("]\n");
 
         *myfile << "found,";
-        for(int i = 0; i < grid_dimension_linear; i++)
+        for (int i = 0; i < grid_dimension_linear; i++)
             *myfile << minParams[i] << ',';
 
         nv_ext::Vec<grid_precision, grid_dimension_linear> minParamsVec(minParams);
-        computeImageKernel<func_precision, grid_precision, grid_dimension_linear, __nTp><<<1,451>>>(minParamsVec,
-                                                                                                       data_p,
-                                                                                                       numRSamples, numASamples,
-                                                                                                       delta_x_m_per_pix, delta_y_m_per_pix,
-                                                                                                       left_m, bottom_m,
-                                                                                                       minRange, maxRange,
-                                                                                                       ax_p,
-                                                                                                       ay_p,
-                                                                                                       az_p,
-                                                                                                       sr_p,
-                                                                                                       sf_p,
-                                                                                                       sip_p,
-                                                                                                       rv_p,
-                                                                                                       oi_p);
+        computeImageKernel<func_precision, grid_precision, grid_dimension_linear, __nTp><<<1, 451>>>(minParamsVec,
+                                                                                                     data_p,
+                                                                                                     numRSamples,
+                                                                                                     numASamples,
+                                                                                                     delta_x_m_per_pix,
+                                                                                                     delta_y_m_per_pix,
+                                                                                                     left_m, bottom_m,
+                                                                                                     minRange, maxRange,
+                                                                                                     ax_p,
+                                                                                                     ay_p,
+                                                                                                     az_p,
+                                                                                                     sr_p,
+                                                                                                     sf_p,
+                                                                                                     sip_p,
+                                                                                                     rv_p,
+                                                                                                     oi_p);
 
     } else {
         printf("Using Quadratic Model\n");
@@ -724,32 +754,38 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         quadFit<NumericType>(yCoeffs, sar_data.Ant_y.data, sar_data.numAzimuthSamples, pulseSkip);
         quadFit<NumericType>(zCoeffs, sar_data.Ant_z.data, sar_data.numAzimuthSamples, pulseSkip);
 
-        printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",xCoeffs[2],xCoeffs[1],xCoeffs[0]);
-        printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",yCoeffs[2],yCoeffs[1],yCoeffs[0]);
-        printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n",zCoeffs[2],zCoeffs[1],zCoeffs[0]);
+        printf("X - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n", xCoeffs[2], xCoeffs[1], xCoeffs[0]);
+        printf("Y - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n", yCoeffs[2], yCoeffs[1], yCoeffs[0]);
+        printf("Z - Quad coeff = %f\n    Slope coeff = %f\n    Const coeff = %f\n", zCoeffs[2], zCoeffs[1], zCoeffs[0]);
 
         *myfile << "gt," << xCoeffs[2] << ',' << xCoeffs[1] << ',' << xCoeffs[0] << ','
                 << yCoeffs[2] << ',' << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
-        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]-gridDiff, (grid_precision) xCoeffs[2],
-                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]-gridDiff, (grid_precision) yCoeffs[2],
-                                                   (grid_precision) zCoeffs[0],(grid_precision) zCoeffs[1]-gridDiff, (grid_precision) zCoeffs[2],
+        std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
+                                                   (grid_precision) xCoeffs[2],
+                                                   (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
+                                                   (grid_precision) yCoeffs[2],
+                                                   (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
+                                                   (grid_precision) zCoeffs[2],
                                                    (grid_precision) 1};
-        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1]+gridDiff, (grid_precision) xCoeffs[2],
-                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1]+gridDiff, (grid_precision) yCoeffs[2],
-                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1]+gridDiff, (grid_precision) zCoeffs[2],
+        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,
+                                                 (grid_precision) xCoeffs[2],
+                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,
+                                                 (grid_precision) yCoeffs[2],
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,
+                                                 (grid_precision) zCoeffs[2],
                                                  (grid_precision) 4};
-        std::vector<grid_precision> grid_numSamples = {(grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision)1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision)4};
+        std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
+                                                       (grid_precision) 4};
 
         image_err_func_byvalue_quadratic host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
         cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_quadratic,
                              sizeof(dev_func_byvalue_ptr_quadratic));
 
-        for(int iii = 0; iii < multiRes; iii++) {
+        for (int iii = 0; iii < multiRes; iii++) {
             CudaGrid<grid_precision, grid_dimension_quadratic> grid;
             ck(cudaMalloc(&grid.data(), grid.bytesSize()));
 
@@ -796,7 +832,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
             grid_precision min_grid_point[grid_dimension_quadratic];
             grid.getGridPoint(min_grid_point, min_value_index1d);
             std::cout << "Minimum found at point p = { ";
-            for (int d=0; d < grid_dimension_quadratic; d++) {
+            for (int d = 0; d < grid_dimension_quadratic; d++) {
                 minParams[d] = min_grid_point[d];
                 std::cout << min_grid_point[d] << ((d < grid_dimension_quadratic - 1) ? ", " : " ");
 
@@ -815,13 +851,13 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         *myfile << "time," << totalTime << ',';
 
         printf("MinParams[");
-        for(int d = 0; d < grid_dimension_quadratic; d++) {
+        for (int d = 0; d < grid_dimension_quadratic; d++) {
             printf("%e,", minParams[d]);
         }
         printf("]\n");
 
         *myfile << "found,";
-        for(int i = 0; i < grid_dimension_quadratic; i++)
+        for (int i = 0; i < grid_dimension_quadratic; i++)
             *myfile << minParams[i] << ',';
 
         // // Non-linear optimizer
@@ -878,20 +914,24 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
         // std::cout << "Iterations: " << lm.iter << ", Return code: " << ret << std::endl;
 
         nv_ext::Vec<grid_precision, grid_dimension_quadratic> minParamsVec(minParams);
-        computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1,451>>>(minParamsVec,
-                                                                                                       data_p,
-                                                                                                       numRSamples, numASamples,
-                                                                                                       delta_x_m_per_pix, delta_y_m_per_pix,
-                                                                                                       left_m, bottom_m,
-                                                                                                       minRange, maxRange,
-                                                                                                       ax_p,
-                                                                                                       ay_p,
-                                                                                                       az_p,
-                                                                                                       sr_p,
-                                                                                                       sf_p,
-                                                                                                       sip_p,
-                                                                                                       rv_p,
-                                                                                                       oi_p);
+        computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1, 451>>>(minParamsVec,
+                                                                                                        data_p,
+                                                                                                        numRSamples,
+                                                                                                        numASamples,
+                                                                                                        delta_x_m_per_pix,
+                                                                                                        delta_y_m_per_pix,
+                                                                                                        left_m,
+                                                                                                        bottom_m,
+                                                                                                        minRange,
+                                                                                                        maxRange,
+                                                                                                        ax_p,
+                                                                                                        ay_p,
+                                                                                                        az_p,
+                                                                                                        sr_p,
+                                                                                                        sf_p,
+                                                                                                        sip_p,
+                                                                                                        rv_p,
+                                                                                                        oi_p);
 
     }
 
@@ -908,7 +948,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     printf("INFO: CUDA Backprojection total time took %f ms.\n", (float) (c2 - c0) * 1000 / CLOCKS_PER_SEC);
     /**/
 
-    int num_img_bytes = sizeof (cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
+    int num_img_bytes = sizeof(cufftComplex) * sar_image_params.N_x_pix * sar_image_params.N_y_pix;
     std::vector<cufftComplex> image_data(sar_image_params.N_x_pix * sar_image_params.N_y_pix);
     //cuda_res.copyFromDevice("output_image", &output_image[0], num_img_bytes);
     cuda_res.copyFromDevice("output_image", image_data.data(), num_img_bytes);
@@ -924,13 +964,14 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp>& sar_data,
     delete[] zCoeffs;
 
     if (finalize_CUDAResources(sar_data, sar_image_params, cuda_res) == EXIT_FAILURE) {
-        std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..." << std::endl;
+        std::cout << "cuda_focus_SAR_image::Problem found de-allocating and free resources on the GPU. Exiting..."
+                  << std::endl;
         return;
     }
     std::cout << cuda_res << std::endl;
 }
 
-void cxxopts_integration_local(cxxopts::Options& options) {
+void cxxopts_integration_local(cxxopts::Options &options) {
 
     options.add_options()
             ("i,input", "Input file", cxxopts::value<std::string>())
@@ -944,17 +985,17 @@ void cxxopts_integration_local(cxxopts::Options& options) {
             ("v,verbose", "Enable verbose output", cxxopts::value<bool>(verbose))
             ("r,dynrange", "Dynamic Range (dB) <70 dB>", cxxopts::value<float>()->default_value("70"))
             ("o,output", "Output file <sar_image.bmp>", cxxopts::value<std::string>()->default_value("sar_image.bmp"))
-            ("h,help", "Print usage")
-            ;
+            ("h,help", "Print usage");
 }
 
 int main(int argc, char **argv) {
     ComplexType test[] = {1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0};
     ComplexType out[8];
     ComplexArrayType data(test, 8);
-    std::unordered_map<std::string, matvar_t*> matlab_readvar_map;
+    std::unordered_map<std::string, matvar_t *> matlab_readvar_map;
 
-    cxxopts::Options options("cpuBackProjection", "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
+    cxxopts::Options options("cpuBackProjection",
+                             "UNC Charlotte Machine Vision Lab SAR Back Projection focusing code.");
     cxxopts_integration_local(options);
 
     auto result = options.parse(argc, argv);
@@ -988,7 +1029,7 @@ int main(int argc, char **argv) {
 
 
         // GOTCHA SAR DATA FILE LOADING
-        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7] 
+//        int azimuth = 1; // 1-360 for all GOTCHA polarities=(HH,VV,HV,VH) and pass=[pass1,...,pass7]
         //        std::string fileprefix = GOTCHA_fileprefix;
         //        std::string filepostfix = GOTCHA_filepostfix;
         //        ss << std::setfill('0') << std::setw(3) << azimuth;
@@ -1035,17 +1076,18 @@ int main(int argc, char **argv) {
 
     // to increase the frequency samples to a power of 2
     // SAR_image_params.N_fft = (int) 0x01 << (int) (ceil(log2(SAR_aperture_data.numRangeSamples)));
-    SAR_image_params.N_fft = (int)SAR_aperture_data.numRangeSamples;
+    SAR_image_params.N_fft = (int) SAR_aperture_data.numRangeSamples;
     //SAR_image_params.N_fft = aperture.numRangeSamples;
-    SAR_image_params.N_x_pix = (int)SAR_aperture_data.numAzimuthSamples;
+    SAR_image_params.N_x_pix = (int) SAR_aperture_data.numAzimuthSamples;
     //SAR_image_params.N_y_pix = image_params.N_fft;
-    SAR_image_params.N_y_pix = (int)SAR_aperture_data.numRangeSamples;
+    SAR_image_params.N_y_pix = (int) SAR_aperture_data.numRangeSamples;
     // focus image on target phase center
     // Determine the maximum scene size of the image (m)
     // max down-range/fast-time/y-axis extent of image (m)
     SAR_image_params.max_Wy_m = CLIGHT / (2.0 * SAR_aperture_data.mean_deltaF);
     // max cross-range/fast-time/x-axis extent of image (m)
-    SAR_image_params.max_Wx_m = CLIGHT / (2.0 * std::abs(SAR_aperture_data.mean_Ant_deltaAz) * SAR_aperture_data.mean_startF);
+    SAR_image_params.max_Wx_m =
+            CLIGHT / (2.0 * std::abs(SAR_aperture_data.mean_Ant_deltaAz) * SAR_aperture_data.mean_startF);
 
     // default view is 100% of the maximum possible view
     SAR_image_params.Wx_m = 1.00 * SAR_image_params.max_Wx_m;
@@ -1054,7 +1096,8 @@ int main(int argc, char **argv) {
     SAR_image_params.N_x_pix = (int) ((float) SAR_image_params.Wx_m * SAR_image_params.N_y_pix) / SAR_image_params.Wy_m;
     // Determine the resolution of the image (m)
     SAR_image_params.slant_rangeResolution = CLIGHT / (2.0 * SAR_aperture_data.mean_bandwidth);
-    SAR_image_params.ground_rangeResolution = SAR_image_params.slant_rangeResolution / std::sin(SAR_aperture_data.mean_Ant_El);
+    SAR_image_params.ground_rangeResolution =
+            SAR_image_params.slant_rangeResolution / std::sin(SAR_aperture_data.mean_Ant_El);
     SAR_image_params.azimuthResolution = CLIGHT / (2.0 * SAR_aperture_data.Ant_totalAz * SAR_aperture_data.mean_startF);
 
     // Print out data after critical data fields for SAR focusing have been computed
@@ -1071,7 +1114,7 @@ int main(int argc, char **argv) {
     //    SAR_ImageFormationParameters<NumericType> SAR_image_params =
     //            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_focusing_data);
 
-    if(nPulse > 2) {
+    if (nPulse > 2) {
         SAR_focusing_data.numAzimuthSamples = nPulse;
     }
 
@@ -1082,7 +1125,11 @@ int main(int argc, char **argv) {
     myfile.open("collectedData.txt", std::ios::out | std::ios::app);
     myfile << inputfile.c_str() << ',';
 
-    printf("Main: deltaAz = %f, deltaF = %f, mean_startF = %f\nmaxWx_m = %f, maxWy_m = %f, Wx_m = %f, Wy_m = %f\nX_pix = %d, Y_pix = %d\nNum Az = %d, Num range = %d\n", SAR_aperture_data.mean_Ant_deltaAz, SAR_aperture_data.mean_startF, SAR_aperture_data.mean_deltaF, SAR_image_params.max_Wx_m, SAR_image_params.max_Wy_m, SAR_image_params.Wx_m, SAR_image_params.Wy_m, SAR_image_params.N_x_pix, SAR_image_params.N_y_pix, SAR_aperture_data.numAzimuthSamples, SAR_aperture_data.numRangeSamples);
+    printf("Main: deltaAz = %f, deltaF = %f, mean_startF = %f\nmaxWx_m = %f, maxWy_m = %f, Wx_m = %f, Wy_m = %f\nX_pix = %d, Y_pix = %d\nNum Az = %d, Num range = %d\n",
+           SAR_aperture_data.mean_Ant_deltaAz, SAR_aperture_data.mean_startF, SAR_aperture_data.mean_deltaF,
+           SAR_image_params.max_Wx_m, SAR_image_params.max_Wy_m, SAR_image_params.Wx_m, SAR_image_params.Wy_m,
+           SAR_image_params.N_x_pix, SAR_image_params.N_y_pix, SAR_aperture_data.numAzimuthSamples,
+           SAR_aperture_data.numRangeSamples);
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
     if (multiRes < 1) multiRes = 1;

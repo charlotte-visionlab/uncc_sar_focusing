@@ -399,7 +399,8 @@ public:
     enum ALGORITHM {
         UNKNOWN,
         MATCHED_FILTER,
-        BACKPROJECTION
+        BACKPROJECTION,
+        PHASE_GRADIENT_ALGORITHM
     } algorithm;
     int pol; // What polarization to image (HH,HV,VH,VV)
     // Define image parameters here
