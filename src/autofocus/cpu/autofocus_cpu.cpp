@@ -98,22 +98,22 @@ struct PGAFunctor {
 //
 //        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
 //            for (int rangeNum = 0; rangeNum < numRange - 1; rangeNum++) { // Because it's a difference
-//                G_dot[rangeNum + pulseNum * numRange].x =
+//                G_dot[rangeNum + pulseNum * numRange]._M_real =
 //                        x(rangeNum + pulseNum * numRange).real() - x(rangeNum + pulseNum * numRange + 1).real();
-//                G_dot[rangeNum + pulseNum * numRange].y =
+//                G_dot[rangeNum + pulseNum * numRange]._M_imag =
 //                        x(rangeNum + pulseNum * numRange).imag() - x(rangeNum + pulseNum * numRange + 1).imag();
 //            }
 //            // To follow the python code where they append the final sample difference to the matrix to make the size the same as the original
-//            G_dot[numRange - 1 + pulseNum * numRange].x = G_dot[numRange - 2 + pulseNum * numRange].x;
-//            G_dot[numRange - 1 + pulseNum * numRange].y = G_dot[numRange - 2 + pulseNum * numRange].y;
+//            G_dot[numRange - 1 + pulseNum * numRange]._M_real = G_dot[numRange - 2 + pulseNum * numRange]._M_real;
+//            G_dot[numRange - 1 + pulseNum * numRange]._M_imag = G_dot[numRange - 2 + pulseNum * numRange]._M_imag;
 //        }
 //
 //        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
 //            float G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
 //            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
 //                int idx = rangeNum + pulseNum * numRange;
-//                phi_dot[pulseNum] += (x(idx).real() * G_dot[idx].y) +
-//                                     (-1 * x(idx).imag() * G_dot[idx].x); // Only the imaginary component is needed
+//                phi_dot[pulseNum] += (x(idx).real() * G_dot[idx]._M_imag) +
+//                                     (-1 * x(idx).imag() * G_dot[idx]._M_real); // Only the imaginary component is needed
 //                G_norm += sqrt(x(idx).real() * x(idx).real() + x(idx).imag() * x(idx).imag());
 //            }
 //            phi_dot[pulseNum] /= G_norm;
@@ -241,6 +241,321 @@ void quadFit(__nTp *coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     coeffs[2] = temp_a;
 }
 
+template<typename __nTp>
+CArray<__nTp> fftunshift(CArray<__nTp>& fft) {
+    return fft.cshift(-1*(fft.size() + 1) / 2);
+}
+
+template<typename __nTp>
+CArray<__nTp> fftzeroshift(CArray<__nTp>& fft) {
+
+    return fft.cshift(-1*(fft.size() + 1) / 2);
+}
+
+template<typename __nTp>
+void autofocus(Complex<__nTp> *data, int numSamples, int numRange, int numIterations) {
+    // TODO: ADD ifft/shift before G_dot stuff
+    // Samples are number of columns, range is the number of rows
+    // Data is column-major ordered
+    // CArray<__nTp> G_dot(numSamples * numRange);
+    Complex<__nTp> *G = new Complex<__nTp>[numSamples * numRange];
+    Complex<__nTp> *G_dot = new Complex<__nTp>[numSamples * numRange]; // Holds the data difference
+    double *phi_dot = new double[numSamples]; // Holds phi_dot and will also hold phi for simplicity
+
+    int iii = 0;
+    for (; iii < numIterations; iii++) {
+        for(int j = 0; j < numSamples; j++) {
+            phi_dot[j] = 0;
+        }
+        CArray<__nTp>temp_g(data, numSamples*numRange);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Shifting the max values
+// For each row
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            CArray<__nTp> phaseData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+            CArray<__nTp> tempData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+
+            // Need to shift phaseData around so max is in the beginning
+            int maxIdx = 0;
+            __nTp maxVal = 0;
+            for (int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                __nTp tempVal = Complex<__nTp>::abs(phaseData[pulseIndex]);
+                if(tempVal > maxVal) {
+                    maxVal = tempVal;
+                    maxIdx = pulseIndex;
+                }
+            }
+
+            phaseData = phaseData.cshift(phaseData.size() / 2 - maxIdx);
+
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                temp_g[rangeIndex + pulseIndex * numRange] = phaseData[pulseIndex];
+            }
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Windowing
+
+        // double s[numSamples] = {0};
+        // for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        //     for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+        //         int idx = rangeNum + pulseNum * numRange;
+        //         s[pulseNum] += Complex<__nTp>::abs(temp_g[idx] * Complex<__nTp>::conj(temp_g[idx]));
+        //     }
+        // }
+
+        // double s_max = 0;
+        // for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        //     if (s_max < s[pulseNum]) s_max = s[pulseNum];
+        // }
+
+        // for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        //     s[pulseNum] = 10 * log10(s[pulseNum]/s_max);
+        // }
+        // int width = 0;
+
+        // if (iii == 0) width = numSamples;
+        // else if (iii == 1) width = numSamples / 2;
+        // else {
+        //     for(int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        //         if (s[pulseNum] > -30) width++;
+        //     }
+        // }
+        // int window_start = (numSamples / 2) - (width / 2);
+        // int window_end = (numSamples / 2) + (width / 2);
+
+        // printf("Window start = %d, window end = %d\n", window_start, window_end);
+        
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Getting G
+        // // For each column
+        // for (int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+        //     CArray<__nTp> phaseData = temp_g[std::slice(pulseIndex * numRange,
+        //                                                             numRange, 1)];
+        //     CArray<__nTp> tempData = temp_g[std::slice(pulseIndex * numRange,
+        //     numRange, 1)];
+
+        //     // Need to shift phaseData around so max is in the beginning
+        //     int maxIdx = 0;
+        //     __nTp maxVal = 0;
+        //     // for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+        //     //     __nTp tempVal = Complex<__nTp>::abs(phaseData[rangeIndex]);
+        //     //     if(tempVal > maxVal) {
+        //     //         maxVal = tempVal;
+        //     //         maxIdx = rangeIndex;
+        //     //     }
+        //     // }
+
+        //     // for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+        //     //     phaseData[rangeIndex] = tempData[maxIdx];
+        //     //     maxIdx += 1;
+        //     //     if (maxIdx == numRange) maxIdx = 0;
+        //     // }
+
+        //     // phaseData = phaseData.cshift(phaseData.size() / 2 - maxIdx);
+
+        //     //ifft(phaseData);
+        //     ifftw(phaseData);
+
+        //     CArray<__nTp> compressed_range = fftshift(phaseData);
+
+        //     for(int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+        //         G[rangeNum + pulseIndex * numRange] = compressed_range[rangeNum];
+        //     }
+        // }
+
+        // For each row
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            CArray<__nTp> phaseData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+            CArray<__nTp> tempData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+
+            // Need to shift phaseData around so max is in the beginning
+            // int maxIdx = 0;
+            // __nTp maxVal = 0;
+            // for (int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            //     __nTp tempVal = Complex<__nTp>::abs(phaseData[pulseIndex]);
+            //     if(tempVal > maxVal) {
+            //         maxVal = tempVal;
+            //         maxIdx = pulseIndex;
+            //     }
+            // }
+
+            // for (int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            //     phaseData[pulseIndex] = tempData[maxIdx];
+            //     maxIdx += 1;
+            //     if (maxIdx == numSamples) maxIdx = 0;
+            // }
+            
+            // phaseData = phaseData.cshift(phaseData.size() / 2 - maxIdx);
+
+            // Complex<__nTp> tempZero(0,0);
+            // for (int pulseIndex = 0; pulseIndex < window_start; pulseIndex++)
+            //     phaseData[pulseIndex] *= tempZero;
+
+            // for (int pulseIndex = window_end; pulseIndex < numSamples; pulseIndex++)
+            //     phaseData[pulseIndex] *= tempZero;
+
+            //ifft(phaseData);
+            ifftw(phaseData);
+
+            CArray<__nTp> compressed_range = fftshift(phaseData);
+
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                G[rangeIndex + pulseIndex * numRange] = compressed_range[pulseIndex];
+            }
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Finding G_dot
+        // For each row (diff by row)
+        for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            for(int pulseNum = 0; pulseNum < numSamples - 1; pulseNum++) {
+                G_dot[rangeNum + pulseNum * numRange] = G[rangeNum + (pulseNum + 1) * numRange] - G[rangeNum + pulseNum * numRange];
+            }
+            G_dot[rangeNum + (numSamples - 1) * numRange] = G_dot[rangeNum + (numSamples - 2) * numRange];
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Finding Phi_dot
+        for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+            double G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
+            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                Complex<__nTp> temp = Complex<__nTp>::conj(G[idx]) * G_dot[idx];
+                phi_dot[pulseNum] += temp.imag();
+                // phi_dot[pulseNum] += (G[idx]._M_real * G_dot[idx]._M_imag) +
+                //                      (-1 * G[idx]._M_imag * G_dot[idx]._M_real); // Only the imaginary component is needed
+                // G_norm += sqrt(data[idx]._M_real * data[idx]._M_real - data[idx]._M_imag * data[idx]._M_imag);
+                G_norm += (Complex<__nTp>::abs(G[idx]) * Complex<__nTp>::abs(G[idx]));
+            }
+            // printf("idx = %d, val = %e, g_norm = %e\n", pulseNum, phi_dot[pulseNum], G_norm);
+            phi_dot[pulseNum] /= G_norm;
+            // printf("idx = %d, val = %e\n", pulseNum, G_norm);
+        }
+
+        for (int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            // printf("idx = %d, val = %f\n", pulseNum, phi_dot[pulseNum]);
+            phi_dot[pulseNum] += phi_dot[pulseNum - 1];
+            // printf("idx = %d, val = %f\n", pulseNum, phi_dot[pulseNum]);
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Removing the linear trend
+        // Don't know if removing the linar trend is needed, will check after applying the correction
+        // TODO: Try removing the linear trend
+        //       Figure out what's causing the numerical instability
+
+        double N = 0;
+        double x1 = 0;
+        double x2 = 0;
+        double f0 = 0;
+        double f1 = 0;
+
+        for (int i = 0; i < numSamples; i++) {
+            N += 1;
+            x1 += i;
+            x2 += i * i;
+            f0 += phi_dot[i];
+            f1 += phi_dot[i] * i;
+        }
+
+        double D = -1 * x1 * x1 + N * x2;
+
+        double a = N * f1 - f0 * x1;
+        double b = f0 * x2 - f1 * x1;
+        a /= D;
+        b /= D;
+        double tempa =  a;
+        double tempb =  b;
+        // printf("tempa = %f\ntempb = %f\na = %f\nb = %f\nD = %f\n", tempa, tempb, a, b, D);
+        for(int i = 0; i < numSamples; i++) {
+            phi_dot[i] -= (tempa * i + tempb);
+            // printf("idx = %d, val = %f\n", i, phi_dot[i]);
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// Condition Check
+
+        double rms = 0;
+        for(int i = 0; i < numSamples; i++) {
+            // printf("iteration = %d, idx = %d, phi_dot = %e\n", iii, i, phi_dot[i]);
+            rms += (phi_dot[i] * phi_dot[i]);
+        }
+        rms /= numSamples;
+        rms = sqrt(rms);
+        printf("rms = %f\n", rms);
+        if(rms < 0.3) break;
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Applying the correction
+        // TODO: Need to figure out what's being done from the np.tile from the python code (mainly a mental visualization issue)
+        // Needed for the correction
+        // For each column
+        // double alpha = 1;
+        // for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+        //     Complex<__nTp> tempExp(cos(alpha * phi_dot[pulseNum]),
+        //                            -1 * sin(alpha * phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+        //     CArray<__nTp> phaseData = temp_g[std::slice(pulseNum * numRange,
+        //                                                             numRange, 1)];
+                                                                
+        //     ifftw(phaseData);
+        //     CArray<__nTp> compressed_range = fftshift(phaseData);
+        //     for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+        //         // int idx = rangeNum + pulseNum * numRange;
+        //         compressed_range[rangeNum] *= tempExp;
+        //     }
+
+        //     //ifft(phaseData);
+        //     // CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+        //     fftw(compressed_range);
+        //     CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+        //     // ifftw(phaseData);
+        //     // CArray<__nTp> compressed_range = fftshift(phaseData);
+        //     for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+        //         int idx = rangeNum + pulseNum * numRange;
+        //         data[idx] = compressed_range[rangeNum];
+        //         // data[idx] = phaseData[rangeNum];
+        //     }
+        // }
+
+        // For each row
+        double alpha = 1;
+        for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            CArray<__nTp> phaseData = temp_g[std::slice(rangeNum, numSamples, numRange)];
+                                                                
+            ifftw(phaseData);
+            CArray<__nTp> compressed_range = fftshift(phaseData);
+            for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+                Complex<__nTp> tempExp(cos(-1 * alpha * phi_dot[pulseNum]),
+                                        sin(-1 * alpha * phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+                // int idx = rangeNum + pulseNum * numRange;
+                compressed_range[pulseNum] *= tempExp;
+            }
+
+            //ifft(phaseData);
+            CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+            fftw(compressed_range2);
+            // CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+            // ifftw(phaseData);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
+            for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                data[idx] = compressed_range2[pulseNum];
+                // data[idx] = phaseData[rangeNum];
+            }
+        }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+// Done
+    }
+
+    printf("Stopping iteration: %d\n", iii);
+    delete[] G;
+    delete[] G_dot;
+    delete[] phi_dot;
+}
+
 template<typename __nTp, typename __nTpParams>
 void run_pga(const SAR_Aperture<__nTp> &sar_data,
             const SAR_ImageFormationParameters<__nTpParams> &sar_image_params,
@@ -309,6 +624,103 @@ void run_pga(const SAR_Aperture<__nTp> &sar_data,
                                                     sar_image_params, compressed_range, range_bin_data,
                                                     output_image);
     }
+
+    // {
+    //     int yIdx = sar_image_params.N_y_pix / 2;
+    //     for (int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+    //         Complex<__nTp> tempComplex(6, 0);
+    //         int idx = yIdx + xIdx * sar_image_params.N_y_pix;
+    //         output_image[idx] = tempComplex;
+    //     }
+    // }
+
+    // {
+    //     int xIdx = sar_image_params.N_x_pix / 2;
+    //     for (int yIdx = 0; yIdx < sar_image_params.N_x_pix; yIdx++) {
+    //         Complex<__nTp> tempComplex(6, 0);
+    //         int idx = yIdx + xIdx * sar_image_params.N_y_pix;
+    //         output_image[idx] = tempComplex;
+    //     }
+    // }
+
+    // // For each column
+    // // random number between 0 - 1/100
+    // for (int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+    //     // // float eps = 2*PI*((double) std::rand())/RAND_MAX;
+    //     float eps = 2 * PI * ((double)xIdx) / sar_image_params.N_x_pix;
+    //     // // float eps = PI / 2;
+    //     // Complex<__nTp> tempComplex(cos(eps), sin(eps));
+    //     CArray<__nTp> phaseData = output_image[std::slice(xIdx * sar_image_params.N_y_pix,
+    //                                                             sar_image_params.N_y_pix, 1)];
+
+    //     //ifft(phaseData);
+    //     ifftw(phaseData);
+
+    //     CArray<__nTp> compressed_range = fftshift(phaseData);
+    //     for (int yIdx = 0; yIdx < sar_image_params.N_y_pix; yIdx++) {
+    //         // float eps = 2*PI*((double) std::rand())/RAND_MAX;
+    //         // float eps = 2 * PI * ((double)yIdx) / sar_image_params.N_y_pix;
+    //         // float eps = PI / 2;
+    //         Complex<__nTp> tempComplex(cos(eps), sin(eps));
+    //         compressed_range[yIdx] *= tempComplex;
+    //     }
+
+    //     CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+    //     fftw(compressed_range2);
+    //     for (int yIdx = 0; yIdx < sar_image_params.N_y_pix; yIdx++) {
+    //         int idx = yIdx + xIdx * sar_image_params.N_y_pix;
+    //         output_image[idx] = compressed_range2[yIdx];
+    //     }
+    // }
+
+    // For each row
+    // random number between 0 - 1/100
+    for (int yIdx = 0; yIdx < sar_image_params.N_y_pix; yIdx++) {
+        // float eps = 2*PI*((double) std::rand())/RAND_MAX;
+        // float eps = 2 * PI * ((double)xIdx) / sar_image_params.N_x_pix;
+        // Complex<__nTp> tempComplex(cos(eps), sin(eps));
+        CArray<__nTp> phaseData = output_image[std::slice(yIdx, sar_image_params.N_x_pix, sar_image_params.N_y_pix)];
+        for(int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+            Complex<__nTp> temp = phaseData[xIdx];
+            temp._M_real = Complex<__nTp>::abs(temp);
+            temp._M_imag = 0;
+            phaseData[xIdx] = temp;
+        }
+        //ifft(phaseData);
+        ifftw(phaseData);
+
+        CArray<__nTp> compressed_range = fftshift(phaseData);
+        for (int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+            float eps = 2 * PI * ((double)xIdx) / sar_image_params.N_x_pix;
+            // float eps = PI / 4;
+            Complex<__nTp> tempComplex(cos(eps), sin(eps));
+            compressed_range[xIdx] *= tempComplex;
+        }
+
+        CArray<__nTp> compressed_range2 = fftshift(compressed_range);
+        fftw(compressed_range2);
+        for (int xIdx = 0; xIdx < sar_image_params.N_x_pix; xIdx++) {
+            int idx = yIdx + xIdx * sar_image_params.N_y_pix;
+
+            output_image[idx] = compressed_range2[xIdx];
+        }
+    }
+
+
+    Complex<__nTp> temp_out[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
+    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+        temp_out[iii] = output_image[iii];
+    autofocus<__nTp>(temp_out, sar_image_params.N_x_pix, sar_image_params.N_y_pix, 30);
+    Complex<__nTp> tempDiff(0,0);
+    float floatDiff = 0;
+    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++) {
+        tempDiff += output_image[iii] - temp_out[iii];
+        floatDiff += abs(Complex<__nTp>::abs(output_image[iii]) - Complex<__nTp>::abs(temp_out[iii]));
+    }
+    std::cout << std::endl << "Output difference after autofocus: " << tempDiff << std::endl;
+    std::cout << std::endl << "Magnitude difference after autofocus: " << floatDiff << std::endl;
+    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+        output_image[iii] = temp_out[iii];
 }
 
 template<typename __nTp, typename __nTpParams>
