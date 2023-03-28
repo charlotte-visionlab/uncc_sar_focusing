@@ -247,12 +247,6 @@ CArray<__nTp> fftunshift(CArray<__nTp>& fft) {
 }
 
 template<typename __nTp>
-CArray<__nTp> fftzeroshift(CArray<__nTp>& fft) {
-
-    return fft.cshift(-1*(fft.size() + 1) / 2);
-}
-
-template<typename __nTp>
 void autofocus(Complex<__nTp> *data, int numSamples, int numRange, int numIterations) {
     // TODO: ADD ifft/shift before G_dot stuff
     // Samples are number of columns, range is the number of rows
@@ -295,18 +289,64 @@ void autofocus(Complex<__nTp> *data, int numSamples, int numRange, int numIterat
         }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Windowing
+        double avg_window[numSamples] = {0};
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                Complex<__nTp> tempHolder = Complex<__nTp>::conj(data[idx]) * data[idx];
+                avg_window[pulseIndex] += tempHolder.real();
+            }
+        }
+
+        double window_maxVal = 0;
+        for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            if(window_maxVal < avg_window[pulseIndex]) window_maxVal = avg_window[pulseIndex];
+        }
+
+        for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            avg_window[pulseIndex] = 10 * log10(avg_window[pulseIndex] / window_maxVal);
+        }
+
+        int leftIdx = -1;
+        int rightIdx = -1;
+        for(int i = 0; i < numSamples / 2; i++) {
+            if(avg_window[i] < -30) leftIdx = i;
+            if(avg_window[i + numSamples / 2] < -30 && rightIdx == -1) rightIdx = i;
+        }
+
+        if (leftIdx == -1) leftIdx = 0;
+        if (rightIdx == -1) rightIdx = numSamples;
+        
+        Complex<__nTp> tempZero(0, 0);
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            for(int pulseIndex = 0; pulseIndex < leftIdx; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                temp_g[idx] *= tempZero;
+            }
+            for(int pulseIndex = rightIdx; pulseIndex < numSamples; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                temp_g[idx] *= tempZero;
+            }
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Getting G
 
         // For each row
         for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
             CArray<__nTp> phaseData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
 
-            ifftw(phaseData);
+            // ifftw(phaseData);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
             CArray<__nTp> compressed_range = fftshift(phaseData);
+            fftw(compressed_range);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
             // ifftw(compressed_range);
 
             for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
                 G[rangeIndex + pulseIndex * numRange] = compressed_range[pulseIndex];
+                // G[rangeIndex + pulseIndex * numRange] = phaseData[pulseIndex];
             }
         }
 
@@ -350,29 +390,6 @@ void autofocus(Complex<__nTp> *data, int numSamples, int numRange, int numIterat
         // Don't know if removing the linar trend is needed, will check after applying the correction
         // TODO: Try removing the linear trend
         //       Figure out what's causing the numerical instability
-
-        // double N = 0;
-        // double x1 = 0;
-        // double x2 = 0;
-        // double f0 = 0;
-        // double f1 = 0;
-
-        // for (int i = 0; i < numSamples; i++) {
-        //     N += 1;
-        //     x1 += i;
-        //     x2 += i * i;
-        //     f0 += phi_dot[i];
-        //     f1 += phi_dot[i] * i;
-        // }
-
-        // double D = -1 * x1 * x1 + N * x2;
-
-        // double a = N * f1 - f0 * x1;
-        // double b = f0 * x2 - f1 * x1;
-        // a /= D;
-        // b /= D;
-        // double tempa =  a;
-        // double tempb =  b;
 
         double sumX = 0.0;
         double sumY = 0.0;
@@ -422,22 +439,23 @@ void autofocus(Complex<__nTp> *data, int numSamples, int numRange, int numIterat
         double alpha = 1;
         for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
             CArray<__nTp> phaseData = temp_img[std::slice(rangeNum, numSamples, numRange)];
-                                                                
-            ifftw(phaseData);
-            CArray<__nTp> compressed_range = fftshift(phaseData);
+            fftw(phaseData);                                                 
+            // ifftw(phaseData);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
             for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
                 Complex<__nTp> tempExp(cos(alpha * phi_dot[pulseNum]),
-                                        sin(1 * alpha * phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+                                        sin(-1 * alpha * phi_dot[pulseNum])); // Something to represent e^(-j*phi)
                 // int idx = rangeNum + pulseNum * numRange;
-                compressed_range[pulseNum] *= tempExp;
+                // compressed_range[pulseNum] *= tempExp;
+                phaseData[pulseNum] *= tempExp;
             }
 
-            //ifft(phaseData);
-            // CArray<__nTp> compressed_range2 = fftshift(compressed_range);
-            fftw(compressed_range);
-            // CArray<__nTp> compressed_range2 = fftshift(compressed_range);
-            // fftw(phaseData);
-            // CArray<__nTp> compressed_range = fftshift(phaseData);
+            // fftw(compressed_range);
+            ifftw(phaseData);
+            CArray<__nTp> compressed_range = phaseData.cshift((phaseData.size()));
+            // ifftw(compressed_range);
+            // compressed_range = fftshift(compressed_range);
+            // compressed_range = fftshift(compressed_range);
             for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
                 int idx = rangeNum + pulseNum * numRange;
                 data[idx] = compressed_range[pulseNum];
