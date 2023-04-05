@@ -22,7 +22,7 @@ if (CUDA_FOUND)
     add_executable(autofocus_gpu
             autofocus_gpu.cu)
     target_compile_options(autofocus_gpu PUBLIC --extended-lambda -Xcudafe --diag_suppress=20012)
-    target_link_libraries(autofocus_gpu lib_uncc_sar_focusing_gpu matio ${CUDA_CUFFT_LIBRARIES} Eigen3::Eigen)
+    target_link_libraries(autofocus_gpu lib_uncc_sar_focusing_gpu matio ${CUDA_CUFFT_LIBRARIES} ${FFTW_FLOAT_LIB} ${FFTW_DOUBLE_LIB} Eigen3::Eigen)
 endif (CUDA_FOUND)
 
 add_subdirectory(cpu)

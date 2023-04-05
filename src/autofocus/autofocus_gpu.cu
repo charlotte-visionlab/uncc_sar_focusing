@@ -35,6 +35,7 @@
 #include <uncc_sar_matio.hpp>
 
 #include "../gpuBackProjection/cuda_sar_focusing/cuda_sar_focusing.hpp"
+#include "../cpuBackProjection/cpuBackProjection.hpp"
 
 #include "gridSearchErrorFunctions.cuh"
 
@@ -412,6 +413,234 @@ void quadFit(__nTp *coeffs, std::vector<__nTp> values, int nPulse, int skip) {
     coeffs[2] = temp_a;
 }
 
+// CPU implementation of autofocus
+template<typename __nTp>
+void autofocus_cpu(Complex<__nTp> *data, int numSamples, int numRange, int numIterations) {
+    // TODO: ADD ifft/shift before G_dot stuff
+    // Samples are number of columns, range is the number of rows
+    // Data is column-major ordered
+    // CArray<__nTp> G_dot(numSamples * numRange);
+    Complex<__nTp> *G = new Complex<__nTp>[numSamples * numRange];
+    Complex<__nTp> *G_dot = new Complex<__nTp>[numSamples * numRange]; // Holds the data difference
+    double *phi_dot = new double[numSamples]; // Holds phi_dot and will also hold phi for simplicity
+
+    int iii = 0;
+    for (; iii < numIterations; iii++) {
+        for(int j = 0; j < numSamples; j++) {
+            phi_dot[j] = 0;
+        }
+        CArray<__nTp>temp_g(data, numSamples*numRange);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Shifting the max values
+// For each row
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            CArray<__nTp> phaseData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+            CArray<__nTp> tempData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+
+            // Need to shift phaseData around so max is in the beginning
+            int maxIdx = 0;
+            __nTp maxVal = 0;
+            for (int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                __nTp tempVal = Complex<__nTp>::abs(phaseData[pulseIndex]);
+                if(tempVal > maxVal) {
+                    maxVal = tempVal;
+                    maxIdx = pulseIndex;
+                }
+            }
+
+            phaseData = phaseData.cshift(phaseData.size() / 2 + maxIdx);
+
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                temp_g[rangeIndex + pulseIndex * numRange] = phaseData[pulseIndex];
+            }
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Windowing
+        double avg_window[numSamples] = {0};
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                Complex<__nTp> tempHolder = Complex<__nTp>::conj(data[idx]) * data[idx];
+                avg_window[pulseIndex] += tempHolder.real();
+            }
+        }
+
+        double window_maxVal = 0;
+        for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            if(window_maxVal < avg_window[pulseIndex]) window_maxVal = avg_window[pulseIndex];
+        }
+
+        for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+            avg_window[pulseIndex] = 10 * log10(avg_window[pulseIndex] / window_maxVal);
+        }
+
+        int leftIdx = -1;
+        int rightIdx = -1;
+        for(int i = 0; i < numSamples / 2; i++) {
+            if(avg_window[i] < -30) leftIdx = i;
+            if(avg_window[i + numSamples / 2] < -30 && rightIdx == -1) rightIdx = i;
+        }
+
+        if (leftIdx == -1) leftIdx = 0;
+        if (rightIdx == -1) rightIdx = numSamples;
+        
+        Complex<__nTp> tempZero(0, 0);
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            for(int pulseIndex = 0; pulseIndex < leftIdx; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                temp_g[idx] *= tempZero;
+            }
+            for(int pulseIndex = rightIdx; pulseIndex < numSamples; pulseIndex++) {
+                int idx = rangeIndex + pulseIndex * numRange;
+                temp_g[idx] *= tempZero;
+            }
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Getting G
+
+        // For each row
+        for (int rangeIndex = 0; rangeIndex < numRange; rangeIndex++) {
+            CArray<__nTp> phaseData = temp_g[std::slice(rangeIndex, numSamples, numRange)];
+
+            // ifftw(phaseData);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
+            CArray<__nTp> compressed_range = fftshift(phaseData);
+            fftw(compressed_range);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
+            // ifftw(compressed_range);
+
+            for(int pulseIndex = 0; pulseIndex < numSamples; pulseIndex++) {
+                G[rangeIndex + pulseIndex * numRange] = compressed_range[pulseIndex];
+                // G[rangeIndex + pulseIndex * numRange] = phaseData[pulseIndex];
+            }
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Finding G_dot
+        // For each row (diff by row)
+        for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            for(int pulseNum = 0; pulseNum < numSamples - 1; pulseNum++) {
+                G_dot[rangeNum + pulseNum * numRange] = G[rangeNum + (pulseNum + 1) * numRange] - G[rangeNum + pulseNum * numRange];
+            }
+            // G_dot[rangeNum + (numSamples - 1) * numRange] = G_dot[rangeNum + (numSamples - 2) * numRange];
+        }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Finding Phi_dot and Phi
+        phi_dot[0] = 0;
+        for (int pulseNum = 0; pulseNum < numSamples-1; pulseNum++) {
+            double G_norm = 0; // Something to temporarily hold the summed data Norm for that sample
+            for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                Complex<__nTp> temp = Complex<__nTp>::conj(G[idx]) * G_dot[idx];
+                phi_dot[pulseNum + 1] += temp.imag();
+                // phi_dot[pulseNum] += (G[idx]._M_real * G_dot[idx]._M_imag) +
+                //                      (-1 * G[idx]._M_imag * G_dot[idx]._M_real); // Only the imaginary component is needed
+                // G_norm += sqrt(data[idx]._M_real * data[idx]._M_real - data[idx]._M_imag * data[idx]._M_imag);
+                G_norm += (Complex<__nTp>::abs(G[idx]) * Complex<__nTp>::abs(G[idx]));
+            }
+            // printf("idx = %d, val = %e, g_norm = %e\n", pulseNum, phi_dot[pulseNum], G_norm);
+            phi_dot[pulseNum + 1] /= G_norm;
+            // printf("idx = %d, val = %e\n", pulseNum, G_norm);
+        }
+
+        for (int pulseNum = 1; pulseNum < numSamples; pulseNum++) { // Integrate to get phi
+            // printf("idx = %d, val = %f\n", pulseNum, phi_dot[pulseNum]);
+            phi_dot[pulseNum] += phi_dot[pulseNum - 1];
+            // printf("idx = %d, val = %f\n", pulseNum, phi_dot[pulseNum]);
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Removing the linear trend
+        // Don't know if removing the linar trend is needed, will check after applying the correction
+        // TODO: Try removing the linear trend
+        //       Figure out what's causing the numerical instability
+
+        double sumX = 0.0;
+        double sumY = 0.0;
+        double sumXY = 0.0;
+        double sumXX = 0.0;
+
+        for (int i = 0; i < numSamples; i++) {
+            sumX += i;
+            sumY += phi_dot[i];
+            sumXY += i*phi_dot[i];
+            sumXX += i * i;
+        }
+
+        double numS = numSamples * sumXY - sumX * sumY;
+        double den = numSamples * sumXX - sumX * sumX;
+
+        double numC = sumY * sumXX - sumX * sumXY;
+
+        double temp1 = numS/den;
+        double temp2 = numC/den;
+        double tempa =  temp1;
+        double tempb =  temp2;
+        // printf("tempa = %f\ntempb = %f\na = %f\nb = %f\nD = %f\n", tempa, tempb, a, b, D);
+        for(int i = 0; i < numSamples; i++) {
+            phi_dot[i] -= (tempa * i + tempb);
+            // printf("idx = %d, val = %f\n", i, phi_dot[i]);
+        }
+
+////////////////////////////////////////////////////////////////////////////////////////////
+// Condition Check
+
+        double rms = 0;
+        for(int i = 0; i < numSamples; i++) {
+            // printf("iteration = %d, idx = %d, phi_dot = %e\n", iii, i, phi_dot[i]);
+            rms += (phi_dot[i] * phi_dot[i]);
+        }
+        rms /= numSamples;
+        rms = sqrt(rms);
+        printf("rms = %f\n", rms);
+        if(rms < 0.1) break;
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// Applying the correction
+        CArray<__nTp>temp_img(data, numSamples*numRange);
+
+        // For each row
+        double alpha = 1;
+        for (int rangeNum = 0; rangeNum < numRange; rangeNum++) {
+            CArray<__nTp> phaseData = temp_img[std::slice(rangeNum, numSamples, numRange)];
+            fftw(phaseData);                                                 
+            // ifftw(phaseData);
+            // CArray<__nTp> compressed_range = fftshift(phaseData);
+            for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+                Complex<__nTp> tempExp(cos(alpha * phi_dot[pulseNum]),
+                                        sin(-1 * alpha * phi_dot[pulseNum])); // Something to represent e^(-j*phi)
+                // int idx = rangeNum + pulseNum * numRange;
+                // compressed_range[pulseNum] *= tempExp;
+                phaseData[pulseNum] *= tempExp;
+            }
+
+            // fftw(compressed_range);
+            ifftw(phaseData);
+            CArray<__nTp> compressed_range = phaseData.cshift((phaseData.size()));
+            // ifftw(compressed_range);
+            // compressed_range = fftshift(compressed_range);
+            // compressed_range = fftshift(compressed_range);
+            for (int pulseNum = 0; pulseNum < numSamples; pulseNum++) {
+                int idx = rangeNum + pulseNum * numRange;
+                data[idx] = compressed_range[pulseNum];
+                // data[idx] = phaseData[rangeNum];
+            }
+        }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+// Done
+    }
+
+    printf("Stopping iteration: %d\n", iii);
+    delete[] G;
+    delete[] G_dot;
+    delete[] phi_dot;
+}
+
 // Alternative to the Levenburg Marquardt Algorithm (taking too long to debug, compile issues)
 // Currently going to be single thread for simplicity
 // Assumes data is already ift, shifted, and normed
@@ -610,7 +839,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
     // GET GRID SEARCH RANGE
     // grid_precision gridDiff = 1e-4f;
     grid_precision gridDiff = 1.3f;
-    grid_precision gridN = 11;
+    grid_precision gridN = 5;
 
     float totalTime = 0;
 
@@ -744,6 +973,8 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                                                                                                      oi_p);
 
     } else {
+        // TODO: Increase the search space
+        // Need to figure out where it'll break
         printf("Using Quadratic Model\n");
         xCoeffs = new float[3];
         yCoeffs = new float[3];
@@ -762,23 +993,23 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                 << yCoeffs[2] << ',' << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
-                                                   (grid_precision) xCoeffs[2],
+                                                   (grid_precision) xCoeffs[2] - gridDiff,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
-                                                   (grid_precision) yCoeffs[2],
+                                                   (grid_precision) yCoeffs[2] - gridDiff,
                                                    (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
-                                                   (grid_precision) zCoeffs[2],
-                                                   (grid_precision) 1};
+                                                   (grid_precision) zCoeffs[2] - gridDiff,
+                                                   (grid_precision) 0.8};
         std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,
-                                                 (grid_precision) xCoeffs[2],
+                                                 (grid_precision) xCoeffs[2] + gridDiff,
                                                  (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,
-                                                 (grid_precision) yCoeffs[2],
+                                                 (grid_precision) yCoeffs[2] + gridDiff,
                                                  (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,
-                                                 (grid_precision) zCoeffs[2],
-                                                 (grid_precision) 4};
-        std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) 1,
-                                                       (grid_precision) 4};
+                                                 (grid_precision) zCoeffs[2] + gridDiff,
+                                                 (grid_precision) 1.2};
+        std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
+                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
+                                                       (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
+                                                       (grid_precision) 5};
 
         image_err_func_byvalue_quadratic host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
@@ -956,7 +1187,16 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         output_image[idx]._M_real = image_data[idx].x;
         output_image[idx]._M_imag = image_data[idx].y;
     }
-
+    std::string beforeAF("sar_image_beforeAF.bmp");
+    writeBMPFile(sar_image_params, output_image, beforeAF); // NOTE: Debugging only
+    Complex<__nTp> temp_out[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
+    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+        temp_out[iii] = output_image[iii];
+    autofocus_cpu<__nTp>(temp_out, sar_image_params.N_x_pix, sar_image_params.N_y_pix, 30);
+    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+        output_image[iii] = temp_out[iii];
+    std::string afterAF("sar_image_afterAF.bmp");
+    writeBMPFile(sar_image_params, output_image, afterAF); // NOTE: Debugging only
     cuda_res.freeGPUMemory("range_vec");
 
     delete[] xCoeffs;
