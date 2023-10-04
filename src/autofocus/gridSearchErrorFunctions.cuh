@@ -142,7 +142,7 @@ cuCalculateColumnEntropy(const SAR_ImageFormationParameters<__nTp> *SARImgParams
     __shared__ __nTp max_val;
     unsigned int xIdx = blockDim.x * blockIdx.x + threadIdx.x;
     __shared__ __nTp tempTempVal[451];
-    __shared__ __nTp tempTempEntropy[451];
+    __shared__ double tempTempEntropy[451];
     if (threadIdx.x == 0) {
         max_val = 0;
         for (int i = 0; i < 451; i++) {
@@ -174,24 +174,54 @@ cuCalculateColumnEntropy(const SAR_ImageFormationParameters<__nTp> *SARImgParams
         pixels[y_dstIndex] = pixel;
     }
 
-    __nTp tempEntropy = 0;
-    unsigned int hist[256] = {0};
-    for (int x = 0; x < height; x++) {
-        hist[(unsigned int) pixels[x]] += 1;
+    __shared__ __nTp tempEntropy;
+    if(threadIdx.x == 0) {
+       tempEntropy = 0;
     }
-    __nTp prob = 0.0;
-    for (int y_dstIndex = 0; y_dstIndex < height; y_dstIndex++) {
-        prob = (float) hist[(unsigned int) pixels[y_dstIndex]] / (float) height;
-        tempTempEntropy[xIdx] -= (prob * log2(prob));
-    }
-    __syncthreads();
+
+    // Column Entropy
+    // unsigned int hist[256] = {0};
+    // for (int x = 0; x < height; x++) {
+    //     hist[(unsigned int) pixels[x]] += 1;
+    // }
+        
+    // // Total Entropy
+    __shared__ unsigned int hist[256];
     if (threadIdx.x == 0) {
-        for (int i = 0; i < 451; i++) {
-            if(tempTempEntropy[i] == 0.0f) tempEntropy += 100.0f;
-            else tempEntropy += tempTempEntropy[i];
+        for(int i = 0; i < 256; i++) {
+            hist[i] = 0;
         }
     }
     __syncthreads();
+    for (int x = 0; x < height; x++) {
+        atomicAdd(&hist[(unsigned int)pixels[x]], 1);
+    }
+    __syncthreads();
+    
+    double prob = 0.0;
+
+    for (int hist_idx = 0; hist_idx < 256; hist_idx++) {
+        if( hist[hist_idx] == 0)
+            continue;
+        
+        prob = ((double) hist[hist_idx]) / ((double)height);
+        // prob = ((double) hist[hist_idx]) / ((double)(width*height));
+        tempTempEntropy[xIdx] -= (prob * log2(prob));
+    }
+
+    __syncthreads();
+
+    // Total Entropy
+    return -tempTempEntropy[xIdx];
+
+    if (threadIdx.x == 0) {
+        for (int i = 0; i < 451; i++) {
+            if(tempTempEntropy[i] == 0.0f) tempEntropy += 100.0f;
+            else tempEntropy -= tempTempEntropy[i];
+        }
+    }
+    __syncthreads();
+    // Column Entropy
     return tempEntropy / width;
 }
 

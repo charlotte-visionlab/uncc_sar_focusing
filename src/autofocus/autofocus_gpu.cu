@@ -706,7 +706,7 @@ template<typename __nTp, typename __nTpParams>
 void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                                const SAR_ImageFormationParameters<__nTpParams> &sar_image_params,
                                CArray<__nTp> &output_image, std::ofstream *myfile, int multiRes, int style,
-                               int pulseSkip) {
+                               int pulseSkip, std::string output_filename) {
 
     switch (sar_image_params.algorithm) {
         case SAR_ImageFormationParameters<__nTpParams>::ALGORITHM::BACKPROJECTION:
@@ -844,6 +844,8 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
     float totalTime = 0;
 
     if (style == 0) {
+        gridDiff = 2.6f;
+        gridN = 23;
         printf("Using Linear Model\n");
         xCoeffs = new float[2];
         yCoeffs = new float[2];
@@ -862,18 +864,19 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                 << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[1] << ',' << zCoeffs[0] << ',';
 
+        grid_precision *covar_matrix = new grid_precision[(grid_dimension_linear+1)*(grid_dimension_linear+1)];
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
                                                    (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
-                                                   (grid_precision) 1};
-        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,
-                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,
-                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,
-                                                 (grid_precision) 4};
-        std::vector<grid_precision> grid_numSamples = {(grid_precision) gridN, (grid_precision) gridN,
-                                                       (grid_precision) gridN, (grid_precision) gridN,
-                                                       (grid_precision) gridN, (grid_precision) gridN,
-                                                       (grid_precision) 4};
+                                                   (grid_precision) 0.9};
+        std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,//(grid_precision) xCoeffs[1] + gridDiff,
+                                                 (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,//(grid_precision) yCoeffs[1] + gridDiff,
+                                                 (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,//(grid_precision) zCoeffs[1] + gridDiff,
+                                                 (grid_precision) 1.1};
+        std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN,
+                                                       (grid_precision) 1, (grid_precision) gridN,
+                                                       (grid_precision) 1, (grid_precision) gridN,
+                                                       (grid_precision) 5};
         image_err_func_byvalue_linear host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
         cudaMemcpyFromSymbol(&host_func_byval_ptr, dev_func_byvalue_ptr_linear,
@@ -936,6 +939,11 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             }
             std::cout << "}" << std::endl;
 
+            for (int i = 0; i < (grid_dimension_linear+1)*(grid_dimension_linear+1); i++) {
+                covar_matrix[i] = 0;
+            }
+            gridsearcher.covariance_by_value(covar_matrix);
+
             ck(cudaFree(grid.data()));
             ck(cudaFree(func_values.data()));
 
@@ -947,6 +955,12 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         printf("MinParams[");
         for (int d = 0; d < grid_dimension_linear; d++) {
             printf("%e,", minParams[d]);
+        }
+        printf("]\n");
+
+        printf("Covariance matrix[");
+        for (int d = 0; d < (grid_dimension_linear+1)*(grid_dimension_linear+1); d++) {
+            printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
 
@@ -992,20 +1006,22 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         *myfile << "gt," << xCoeffs[2] << ',' << xCoeffs[1] << ',' << xCoeffs[0] << ','
                 << yCoeffs[2] << ',' << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
+
+        grid_precision *covar_matrix = new grid_precision[(grid_dimension_quadratic+1)*(grid_dimension_quadratic+1)];
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
-                                                   (grid_precision) xCoeffs[2] - gridDiff,
+                                                   (grid_precision) xCoeffs[2] - gridDiff/2,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
-                                                   (grid_precision) yCoeffs[2] - gridDiff,
+                                                   (grid_precision) yCoeffs[2] - gridDiff/2,
                                                    (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
-                                                   (grid_precision) zCoeffs[2] - gridDiff,
-                                                   (grid_precision) 0.8};
+                                                   (grid_precision) zCoeffs[2] - gridDiff/2,
+                                                   (grid_precision) 0.9};
         std::vector<grid_precision> end_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] + gridDiff,
-                                                 (grid_precision) xCoeffs[2] + gridDiff,
+                                                 (grid_precision) xCoeffs[2] + gridDiff/2,
                                                  (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] + gridDiff,
-                                                 (grid_precision) yCoeffs[2] + gridDiff,
+                                                 (grid_precision) yCoeffs[2] + gridDiff/2,
                                                  (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] + gridDiff,
-                                                 (grid_precision) zCoeffs[2] + gridDiff,
-                                                 (grid_precision) 1.2};
+                                                 (grid_precision) zCoeffs[2] + gridDiff/2,
+                                                 (grid_precision) 1.1};
         std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
                                                        (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
                                                        (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
@@ -1073,6 +1089,11 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             }
             std::cout << "}" << std::endl;
 
+            for (int i = 0; i < (grid_dimension_quadratic+1)*(grid_dimension_quadratic+1); i++) {
+                covar_matrix[i] = 0;
+            }
+            gridsearcher.covariance_by_value(covar_matrix);
+
             ck(cudaFree(grid.data()));
             ck(cudaFree(func_values.data()));
 
@@ -1084,6 +1105,13 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         printf("MinParams[");
         for (int d = 0; d < grid_dimension_quadratic; d++) {
             printf("%e,", minParams[d]);
+        }
+        printf("]\n");
+
+        
+        printf("Covariance matrix[");
+        for (int d = 0; d < (grid_dimension_quadratic+1)*(grid_dimension_quadratic+1); d++) {
+            printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
 
@@ -1187,7 +1215,8 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         output_image[idx]._M_real = image_data[idx].x;
         output_image[idx]._M_imag = image_data[idx].y;
     }
-    std::string beforeAF("sar_image_beforeAF.bmp");
+    std::string tempStr("_beforeAF.bmp");
+    std::string beforeAF = output_filename + tempStr;
     writeBMPFile(sar_image_params, output_image, beforeAF); // NOTE: Debugging only
     Complex<__nTp> temp_out[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
     for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
@@ -1196,7 +1225,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
     for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
         output_image[iii] = temp_out[iii];
     std::string afterAF("sar_image_afterAF.bmp");
-    writeBMPFile(sar_image_params, output_image, afterAF); // NOTE: Debugging only
+    // writeBMPFile(sar_image_params, output_image, afterAF); // NOTE: Debugging only
     cuda_res.freeGPUMemory("range_vec");
 
     delete[] xCoeffs;
@@ -1373,10 +1402,11 @@ int main(int argc, char **argv) {
     ComplexArrayType output_image(SAR_image_params.N_y_pix * SAR_image_params.N_x_pix);
 
     if (multiRes < 1) multiRes = 1;
-    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style, pulseSkip);
+    std::string output_filename = result["output"].as<std::string>();
+    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style, pulseSkip, output_filename);
 
     // Required parameters for output generation manually overridden by command line arguments
-    std::string output_filename = result["output"].as<std::string>();
+    // std::string output_filename = result["output"].as<std::string>();
     SAR_image_params.dyn_range_dB = result["dynrange"].as<float>();
 
     writeBMPFile(SAR_image_params, output_image, output_filename);

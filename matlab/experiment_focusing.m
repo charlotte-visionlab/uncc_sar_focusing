@@ -1,5 +1,5 @@
 clear;
-clc;
+% clc;
 
 % Change these file paths to match your path setup
 % dataFolder_reference = fullfile('Data');
@@ -8,23 +8,24 @@ clc;
 num_search_recursions = '1';
 PLOT_TRAJECTORY = true;
 DATASET_INDEX = 1;
-USER_FOLDER = 'arwillis';
+USER_FOLDER = 'cbeam18';
 
 % Beam - HOME SITE CONFIG
-%execute_binary='../build/bin/autofocus_gpu';
+execute_binary='../build/bin/autofocus_gpu';
 %dataFolder_root = fullfile('/home', USER_FOLDER, 'CLionProjects', 'sar_focusing_exps');
 %dataFolder_results = fullfile('/home', USER_FOLDER,  'CLionProjects', 'sar_focusing_exps', 'results');
-% dataFolder_dataset = fullfile('Data');
-% dataFolder_results = fullfile('OutputImages');
+dataFolder_dataset = fullfile('Data');
+dataFolder_results = fullfile('OutputImages');
+library_path='../build/lib';
 
 % Willis - UNIVERSITY SITE CONFIG
 %dataFolder_root = fullfile('/home', USER_FOLDER, 'CLionProjects', 'georeg_exps');
 %dataFolder_root = fullfile('/home','server', 'SAR');
 % Willis - HOME SITE CONFIG
-dataFolder_dataset = fullfile('/home', USER_FOLDER, 'sar', 'GOTCHA', 'Gotcha-CP-All');
-dataFolder_results = fullfile('/home', USER_FOLDER,  'CLionProjects', 'sar_focusing_exps', 'results');
-execute_binary='../cmake-build-debug/bin/autofocus_gpu';
-library_path='../cmake-build-debug/lib';
+% dataFolder_dataset = fullfile('/home', USER_FOLDER, 'sar', 'GOTCHA', 'Gotcha-CP-All');
+% dataFolder_results = fullfile('/home', USER_FOLDER,  'CLionProjects', 'sar_focusing_exps', 'results');
+% execute_binary='../cmake-build-debug/bin/autofocus_gpu';
+% library_path='../cmake-build-debug/lib';
 
 extList{1} = '.mat';
 imds = imageDatastore(dataFolder_dataset, 'IncludeSubfolders',true,'LabelSource','foldernames','FileExtensions', extList);
@@ -36,11 +37,11 @@ f1_handle = figure('visible','off');
 
 %for modelIdx=2:length(models)
 %for modelIdx=1:1
-for modelIdx=2:2
+for modelIdx=1:2
     
     if (strcmp(models{modelIdx},'Linear')==1)
         model_type = "0";
-        nPulses = "20";
+        nPulses = "30";
     else
         model_type = "1";
         nPulses = "117";
@@ -74,7 +75,9 @@ for modelIdx=2:2
         grid_values.stepsize = str2num(grid_values_str{28}{1});
         grid_values.numsteps = str2num(grid_values_str{29}{1});
         result = regexp(cmdout,"MinParams\[([^\]]*)]", "tokens");
+        covarText = regexp(cmdout,"Covariance matrix\[([^\]]*)]", "tokens");
         estCoeff = reshape(str2num(result{1}{1}),1,[]);
+        covarMat = reshape(str2num(covarText{1}{1}),1,[]);
         if (strcmp(models{modelIdx},'Linear')==1)
             estTrajx = estCoeff(2) * (1:num_focused_pulses) + estCoeff(1);
             estTrajy = estCoeff(4) * (1:num_focused_pulses) + estCoeff(3);
@@ -102,6 +105,9 @@ for modelIdx=2:2
             drawnow;
         end
         
+        % Get covariance, look into orthogonal-ness of the lines (figure
+        % out why it's not lining up), check final number (metric)
+        
         dataset(modelIdx).results(fileIdx).filename = image_ref;
         dataset(modelIdx).results(fileIdx).grid = grid_values;
         dataset(modelIdx).results(fileIdx).model_coefficients = estCoeff;
@@ -110,6 +116,7 @@ for modelIdx=2:2
         dataset(modelIdx).results(fileIdx).num_focused_pulses = num_focused_pulses;
         dataset(modelIdx).results(fileIdx).multiresolution = num_search_recursions;
         dataset(modelIdx).results(fileIdx).model_type = models{modelIdx};
+        dataset(modelIdx).results(fileIdx).covariance_matrix = covarMat;
         
         dataset(modelIdx).match(fileIdx).runtime = runtime;
     end
