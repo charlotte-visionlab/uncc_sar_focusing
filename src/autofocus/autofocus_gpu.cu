@@ -963,7 +963,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
-
+        delete[] covar_matrix;
         *myfile << "found,";
         for (int i = 0; i < grid_dimension_linear; i++)
             *myfile << minParams[i] << ',';
@@ -1114,6 +1114,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
+        delete[] covar_matrix;
 
         *myfile << "found,";
         for (int i = 0; i < grid_dimension_quadratic; i++)
