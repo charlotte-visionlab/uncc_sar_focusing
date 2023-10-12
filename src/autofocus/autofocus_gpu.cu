@@ -902,7 +902,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             CudaGridSearcher<func_precision, grid_precision, grid_dimension_linear> gridsearcher(grid, func_values);
 
             c1 = clock();
-            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, sar_image_params.N_x_pix,
                     // gridsearcher.search_by_value(host_func_byval_ptr,
                                                 data_p,
                                                 numRSamples, numASamples,
@@ -969,7 +969,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             *myfile << minParams[i] << ',';
 
         nv_ext::Vec<grid_precision, grid_dimension_linear> minParamsVec(minParams);
-        computeImageKernel<func_precision, grid_precision, grid_dimension_linear, __nTp><<<1, 451>>>(minParamsVec,
+        computeImageKernel<func_precision, grid_precision, grid_dimension_linear, __nTp><<<1, sar_image_params.N_x_pix>>>(minParamsVec,
                                                                                                      data_p,
                                                                                                      numRSamples,
                                                                                                      numASamples,
@@ -1052,7 +1052,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             CudaGridSearcher<func_precision, grid_precision, grid_dimension_quadratic> gridsearcher(grid, func_values);
 
             c1 = clock();
-            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, 451,
+            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, sar_image_params.N_x_pix,
                     // gridsearcher.search_by_value(host_func_byval_ptr,
                                                 data_p,
                                                 numRSamples, numASamples,
@@ -1174,7 +1174,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         // std::cout << "Iterations: " << lm.iter << ", Return code: " << ret << std::endl;
 
         nv_ext::Vec<grid_precision, grid_dimension_quadratic> minParamsVec(minParams);
-        computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1, 451>>>(minParamsVec,
+        computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1, sar_image_params.N_x_pix>>>(minParamsVec,
                                                                                                         data_p,
                                                                                                         numRSamples,
                                                                                                         numASamples,
