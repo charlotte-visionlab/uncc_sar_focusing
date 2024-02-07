@@ -37,7 +37,7 @@
 #include "../gpuBackProjection/cuda_sar_focusing/cuda_sar_focusing.hpp"
 #include "../cpuBackProjection/cpuBackProjection.hpp"
 
-#include "gridSearchErrorFunctions.cuh"
+#include "gridSearchErrorFunctions_dft.cuh"
 
 #define EIGEN_DEFAULT_DENSE_INDEX_TYPE int
 #include <Eigen/Dense>
@@ -279,6 +279,8 @@ struct my_functor : Functor<float> {
         return 0;
     }
 };
+
+
 
 template<typename __nTp>
 std::vector<__nTp> vectorDiff(std::vector<__nTp> values) {
@@ -817,7 +819,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             "sar_image_params");
     __nTp *rv_p = cuda_res.getDeviceMemPointer<__nTp>("range_vec");
     cufftComplex *oi_p = cuda_res.getDeviceMemPointer<cufftComplex>("output_image");
-    checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 1 << 30));
+    checkCudaErrors(cudaDeviceSetLimit(cudaLimitMallocHeapSize, 24 * (1ULL << 30)));
 
     numRSamples_nl = numRSamples;
     numASamples_nl = numASamples;
@@ -864,7 +866,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                 << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[1] << ',' << zCoeffs[0] << ',';
 
-        grid_precision *covar_matrix = new grid_precision[(grid_dimension_linear+1)*(grid_dimension_linear+1)];
+        grid_precision *covar_matrix = new grid_precision[(grid_dimension_linear)*(grid_dimension_linear)];
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
                                                    (grid_precision) zCoeffs[0], (grid_precision) zCoeffs[1] - gridDiff,
@@ -939,7 +941,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             }
             std::cout << "}" << std::endl;
 
-            for (int i = 0; i < (grid_dimension_linear+1)*(grid_dimension_linear+1); i++) {
+            for (int i = 0; i < (grid_dimension_linear)*(grid_dimension_linear); i++) {
                 covar_matrix[i] = 0;
             }
             gridsearcher.covariance_by_value(covar_matrix);
@@ -959,7 +961,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         printf("]\n");
 
         printf("Covariance matrix[");
-        for (int d = 0; d < (grid_dimension_linear+1)*(grid_dimension_linear+1); d++) {
+        for (int d = 0; d < (grid_dimension_linear)*(grid_dimension_linear); d++) {
             printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
@@ -1007,7 +1009,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                 << yCoeffs[2] << ',' << yCoeffs[1] << ',' << yCoeffs[0] << ','
                 << zCoeffs[2] << ',' << zCoeffs[1] << ',' << zCoeffs[0] << ',';
 
-        grid_precision *covar_matrix = new grid_precision[(grid_dimension_quadratic+1)*(grid_dimension_quadratic+1)];
+        grid_precision *covar_matrix = new grid_precision[(grid_dimension_quadratic)*(grid_dimension_quadratic)];
         std::vector<grid_precision> start_point = {(grid_precision) xCoeffs[0], (grid_precision) xCoeffs[1] - gridDiff,
                                                    (grid_precision) xCoeffs[2] - gridDiff/2,
                                                    (grid_precision) yCoeffs[0], (grid_precision) yCoeffs[1] - gridDiff,
@@ -1052,7 +1054,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             CudaGridSearcher<func_precision, grid_precision, grid_dimension_quadratic> gridsearcher(grid, func_values);
 
             c1 = clock();
-            gridsearcher.search_by_value_stream(host_func_byval_ptr, 1000, sar_image_params.N_x_pix,
+            gridsearcher.search_by_value_block(host_func_byval_ptr, sar_image_params.N_x_pix,
                     // gridsearcher.search_by_value(host_func_byval_ptr,
                                                 data_p,
                                                 numRSamples, numASamples,
@@ -1077,6 +1079,11 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             func_values.find_extrema(min_value, min_value_index1d);
 
             grid_precision min_grid_point[grid_dimension_quadratic];
+
+            float covar_diag[7] = {covar_matrix[11], covar_matrix[22], covar_matrix[44], covar_matrix[55], covar_matrix[77], covar_matrix[88], covar_matrix[99]};
+            
+            // min_value_index1d = gridsearcher.get_second_min();
+            std::cout << "Min idx: " << min_value_index1d << std::endl;
             grid.getGridPoint(min_grid_point, min_value_index1d);
             std::cout << "Minimum found at point p = { ";
             for (int d = 0; d < grid_dimension_quadratic; d++) {
@@ -1089,10 +1096,21 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             }
             std::cout << "}" << std::endl;
 
-            for (int i = 0; i < (grid_dimension_quadratic+1)*(grid_dimension_quadratic+1); i++) {
+            for (int i = 0; i < (grid_dimension_quadratic)*(grid_dimension_quadratic); i++) {
                 covar_matrix[i] = 0;
             }
             gridsearcher.covariance_by_value(covar_matrix);
+            
+            // min_grid_point[0] = xCoeffs[0];
+            // min_grid_point[1] = xCoeffs[1];
+            // min_grid_point[2] = xCoeffs[2];
+            // min_grid_point[3] = yCoeffs[0];
+            // min_grid_point[4] = yCoeffs[1];
+            // min_grid_point[5] = yCoeffs[2];
+            // min_grid_point[6] = zCoeffs[0];
+            // min_grid_point[7] = zCoeffs[1];
+            // min_grid_point[8] = zCoeffs[2];
+            // min_grid_point[9] = 1.0;
 
             ck(cudaFree(grid.data()));
             ck(cudaFree(func_values.data()));
@@ -1110,7 +1128,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
 
         
         printf("Covariance matrix[");
-        for (int d = 0; d < (grid_dimension_quadratic+1)*(grid_dimension_quadratic+1); d++) {
+        for (int d = 0; d < (grid_dimension_quadratic)*(grid_dimension_quadratic); d++) {
             printf("%e,", covar_matrix[d]);
         }
         printf("]\n");
@@ -1216,16 +1234,16 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         output_image[idx]._M_real = image_data[idx].x;
         output_image[idx]._M_imag = image_data[idx].y;
     }
-    std::string tempStr("_beforeAF.bmp");
-    std::string beforeAF = output_filename + tempStr;
-    writeBMPFile(sar_image_params, output_image, beforeAF); // NOTE: Debugging only
-    Complex<__nTp> temp_out[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
-    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
-        temp_out[iii] = output_image[iii];
-    autofocus_cpu<__nTp>(temp_out, sar_image_params.N_x_pix, sar_image_params.N_y_pix, 30);
-    for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
-        output_image[iii] = temp_out[iii];
-    std::string afterAF("sar_image_afterAF.bmp");
+    // std::string tempStr("_beforeAF.bmp");
+    // std::string beforeAF = output_filename + tempStr;
+    // writeBMPFile(sar_image_params, output_image, beforeAF); // NOTE: Debugging only
+    // Complex<__nTp> temp_out[sar_image_params.N_x_pix * sar_image_params.N_y_pix];
+    // for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+    //     temp_out[iii] = output_image[iii];
+    // autofocus_cpu<__nTp>(temp_out, sar_image_params.N_x_pix, sar_image_params.N_y_pix, 30);
+    // for(int iii = 0; iii < sar_image_params.N_x_pix * sar_image_params.N_y_pix; iii++)
+    //     output_image[iii] = temp_out[iii];
+    // std::string afterAF("sar_image_afterAF.bmp");
     // writeBMPFile(sar_image_params, output_image, afterAF); // NOTE: Debugging only
     cuda_res.freeGPUMemory("range_vec");
 
@@ -1244,7 +1262,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
 void cxxopts_integration_local(cxxopts::Options &options) {
 
     options.add_options()
-            ("i,input", "Input file", cxxopts::value<std::string>())
+            ("i,input", "Input file", cxxopts::value<std::vector<std::string>>())
             ("k,pulseSkip", "Number of pulses to skip for estimation", cxxopts::value<int>()->default_value("1"))
             ("m,multi", "Multiresolution Value", cxxopts::value<int>()->default_value("1"))
             ("n,numPulse", "Number of pulses to focus", cxxopts::value<int>()->default_value("0"))
@@ -1284,8 +1302,14 @@ int main(int argc, char **argv) {
     initialize_GOTCHA_MATRead(matlab_readvar_map);
 
     std::string inputfile;
+    std::vector<std::string> inputfiles;
     if (result.count("input")) {
-        inputfile = result["input"].as<std::string>();
+        // inputfile = result["input"].as<std::string>();
+        auto& ff = result["input"].as<std::vector<std::string>>();
+        for (const auto& f : ff) {
+            inputfiles.push_back(f);
+        }
+    inputfile = inputfiles[0];
     } else {
         std::stringstream ss;
 
@@ -1310,10 +1334,83 @@ int main(int argc, char **argv) {
     std::cout << "Successfully opened MATLAB file " << inputfile << "." << std::endl;
 
     SAR_Aperture<NumericType> SAR_aperture_data;
+    SAR_Aperture<NumericType> SAR_aperture_data_temp;
+    SAR_Aperture<NumericType> SAR_aperture_data_temp2;
+
     if (read_MAT_Variables(inputfile, matlab_readvar_map, SAR_aperture_data) == EXIT_FAILURE) {
         std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
         return EXIT_FAILURE;
     }
+
+    for (int file_idx = 1; file_idx < inputfiles.size(); file_idx++) {
+        if (read_MAT_Variables(inputfiles[file_idx], matlab_readvar_map, SAR_aperture_data_temp) == EXIT_FAILURE) {
+            std::cout << "Could not read all desired MATLAB variables from " << inputfile << " exiting." << std::endl;
+            return EXIT_FAILURE;
+        }
+        // Double check uncc_sar_focusing.hpp if things were correctly appended
+        SAR_aperture_data.sampleData.data.insert(SAR_aperture_data.sampleData.data.end(), SAR_aperture_data_temp.sampleData.data.begin(), SAR_aperture_data_temp.sampleData.data.end());
+        SAR_aperture_data.Ant_x.data.insert(SAR_aperture_data.Ant_x.data.end(), SAR_aperture_data_temp.Ant_x.data.begin(), SAR_aperture_data_temp.Ant_x.data.end());
+        SAR_aperture_data.Ant_y.data.insert(SAR_aperture_data.Ant_y.data.end(), SAR_aperture_data_temp.Ant_y.data.begin(), SAR_aperture_data_temp.Ant_y.data.end());
+        SAR_aperture_data.Ant_z.data.insert(SAR_aperture_data.Ant_z.data.end(), SAR_aperture_data_temp.Ant_z.data.begin(), SAR_aperture_data_temp.Ant_z.data.end());
+        SAR_aperture_data.slant_range.data.insert(SAR_aperture_data.slant_range.data.end(), SAR_aperture_data_temp.slant_range.data.begin(), SAR_aperture_data_temp.slant_range.data.end());
+        SAR_aperture_data.theta.data.insert(SAR_aperture_data.theta.data.end(), SAR_aperture_data_temp.theta.data.begin(), SAR_aperture_data_temp.theta.data.end());
+        SAR_aperture_data.phi.data.insert(SAR_aperture_data.phi.data.end(), SAR_aperture_data_temp.phi.data.begin(), SAR_aperture_data_temp.phi.data.end());
+        SAR_aperture_data.af.r_correct.data.insert(SAR_aperture_data.af.r_correct.data.end(), SAR_aperture_data_temp.af.r_correct.data.begin(), SAR_aperture_data_temp.af.r_correct.data.end());
+        SAR_aperture_data.af.ph_correct.data.insert(SAR_aperture_data.af.ph_correct.data.end(), SAR_aperture_data_temp.af.ph_correct.data.begin(), SAR_aperture_data_temp.af.ph_correct.data.end());
+
+        SAR_aperture_data.sampleData.shape[1] += SAR_aperture_data_temp.sampleData.shape[1];
+        SAR_aperture_data.Ant_x.shape[1] += SAR_aperture_data_temp.Ant_x.shape[1];
+        SAR_aperture_data.Ant_y.shape[1] += SAR_aperture_data_temp.Ant_y.shape[1];
+        SAR_aperture_data.Ant_z.shape[1] += SAR_aperture_data_temp.Ant_z.shape[1];
+        SAR_aperture_data.slant_range.shape[1] += SAR_aperture_data_temp.slant_range.shape[1];
+        SAR_aperture_data.theta.shape[1] += SAR_aperture_data_temp.theta.shape[1];
+        SAR_aperture_data.phi.shape[1] += SAR_aperture_data_temp.phi.shape[1];
+        SAR_aperture_data.af.r_correct.shape[1] += SAR_aperture_data_temp.af.r_correct.shape[1];
+        SAR_aperture_data.af.ph_correct.shape[1] += SAR_aperture_data_temp.af.ph_correct.shape[1];
+    }
+
+    int shape_count = 0;
+
+    // Shrink the data to requested values
+    for (int idx = 0; idx < nPulse && idx < SAR_aperture_data.Ant_x.shape[1]; idx += pulseSkip) {
+        SAR_aperture_data_temp2.Ant_x.data.push_back(SAR_aperture_data.Ant_x.data[idx]);
+        SAR_aperture_data_temp2.Ant_y.data.push_back(SAR_aperture_data.Ant_y.data[idx]);
+        SAR_aperture_data_temp2.Ant_z.data.push_back(SAR_aperture_data.Ant_z.data[idx]);
+
+        SAR_aperture_data_temp2.slant_range.data.push_back(SAR_aperture_data.slant_range.data[idx]);
+        SAR_aperture_data_temp2.theta.data.push_back(SAR_aperture_data.theta.data[idx]);
+        SAR_aperture_data_temp2.phi.data.push_back(SAR_aperture_data.phi.data[idx]);
+        SAR_aperture_data_temp2.af.r_correct.data.push_back(SAR_aperture_data.af.r_correct.data[idx]);
+        SAR_aperture_data_temp2.af.ph_correct.data.push_back(SAR_aperture_data.af.ph_correct.data[idx]);
+
+        SAR_aperture_data_temp2.sampleData.data.insert(
+            SAR_aperture_data_temp2.sampleData.data.end(), 
+            &SAR_aperture_data.sampleData.data[idx*SAR_aperture_data.sampleData.shape[0]], 
+            &SAR_aperture_data.sampleData.data[idx*SAR_aperture_data.sampleData.shape[0] + SAR_aperture_data.sampleData.shape[0]]
+        );
+        shape_count += 1;
+    }
+
+    SAR_aperture_data.sampleData.data = SAR_aperture_data_temp2.sampleData.data;
+    SAR_aperture_data.Ant_x.data = SAR_aperture_data_temp2.Ant_x.data;
+    SAR_aperture_data.Ant_y.data = SAR_aperture_data_temp2.Ant_y.data;
+    SAR_aperture_data.Ant_z.data = SAR_aperture_data_temp2.Ant_z.data;
+    SAR_aperture_data.slant_range.data = SAR_aperture_data_temp2.slant_range.data;
+    SAR_aperture_data.theta.data = SAR_aperture_data_temp2.theta.data;
+    SAR_aperture_data.phi.data = SAR_aperture_data_temp2.phi.data;
+    SAR_aperture_data.af.r_correct.data = SAR_aperture_data_temp2.af.r_correct.data;
+    SAR_aperture_data.af.ph_correct.data = SAR_aperture_data_temp2.af.ph_correct.data;
+
+    SAR_aperture_data.sampleData.shape[1] = shape_count;
+    SAR_aperture_data.Ant_x.shape[1] = shape_count;
+    SAR_aperture_data.Ant_y.shape[1] = shape_count;
+    SAR_aperture_data.Ant_z.shape[1] = shape_count;
+    SAR_aperture_data.slant_range.shape[1] = shape_count;
+    SAR_aperture_data.theta.shape[1] = shape_count;
+    SAR_aperture_data.phi.shape[1] = shape_count;
+    SAR_aperture_data.af.r_correct.shape[1] = shape_count;
+    SAR_aperture_data.af.ph_correct.shape[1] = shape_count;
+
     // Print out raw data imported from file
     std::cout << SAR_aperture_data << std::endl;
 
@@ -1384,7 +1481,7 @@ int main(int argc, char **argv) {
     //    SAR_ImageFormationParameters<NumericType> SAR_image_params =
     //            SAR_ImageFormationParameters<NumericType>::create<NumericType>(SAR_focusing_data);
 
-    if (nPulse > 2) {
+    if (nPulse > 2 && nPulse < SAR_focusing_data.numAzimuthSamples) {
         SAR_focusing_data.numAzimuthSamples = nPulse;
     }
 
@@ -1404,7 +1501,7 @@ int main(int argc, char **argv) {
 
     if (multiRes < 1) multiRes = 1;
     std::string output_filename = result["output"].as<std::string>();
-    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style, pulseSkip, output_filename);
+    grid_cuda_focus_SAR_image(SAR_focusing_data, SAR_image_params, output_image, &myfile, multiRes, style, 1, output_filename);
 
     // Required parameters for output generation manually overridden by command line arguments
     // std::string output_filename = result["output"].as<std::string>();
