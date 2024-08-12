@@ -189,7 +189,7 @@ Status ConvertAndResizeImage(const CArray<__nTp>& image, const int height_orig, 
       Const(root.WithOpName("size"), {224, 224}));
     // Subtract the mean and divide by the scale.
     Div output_op(root.WithOpName(output_name), Sub(root, resized, {0.0f}),
-                    {1.0f});
+                    {255.0f});
     // This runs the GraphDef network definition that we've just constructed, and
     // returns the results in the output tensor.
     tensorflow::GraphDef graph;
@@ -872,7 +872,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
 
     // Might as well hard code the Alexnet Model at the start
     std::unique_ptr<tensorflow::Session> session;
-    Status load_graph_status = LoadGraph("/home/cbeam18/Desktop/uncc_sar_focusing/matlab/TensorflowStuff/Model/frozen_models/frozen_graph.pb", &session);
+    Status load_graph_status = LoadGraph("/home/cbeam18/Desktop/uncc_sar_focusing/matlab/TensorflowStuff/Model/frozen_models/frozen_graph_224.pb", &session);
     if (!load_graph_status.ok()) {
         LOG(ERROR) << load_graph_status;
         return;
@@ -944,7 +944,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
     int numSamples = sar_data.sampleData.data.size();
     int newSize = pow(2, ceil(log(sar_data.sampleData.data.size()) / log(2)));
 
-    clock_t c0, c1, c2;
+    clock_t c0, c1, c2, c3, c4;
 
     c0 = clock();
     //std::cout << printf("N_fft: %d, numAzimuthSamples: %d, numSamples: %d\n\n",sar_image_params.N_fft, sar_data.numAzimuthSamples, newSize);
@@ -1197,7 +1197,7 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         std::vector<grid_precision> grid_numSamples = {(grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
                                                        (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
                                                        (grid_precision) 1, (grid_precision) gridN, (grid_precision) gridN,
-                                                       (grid_precision) 5};
+                                                       (grid_precision) 5}; 
 
         image_err_func_byvalue_quadratic host_func_byval_ptr;
         // Copy device function pointer for the function having by-value parameters to host side
@@ -1257,12 +1257,13 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
             grid_precision min_grid_point[grid_dimension_quadratic];
 
             // Start of loop
+            c1 = clock();
             for(int aaa = 0; aaa < grid.numElements(); aaa++){
             // for(int aaa = 0; aaa < 10; aaa++){
                 // Find min
                 func_values.find_extrema(min_value, min_value_index1d);
                 grid.getGridPoint(min_grid_point, min_value_index1d);
-
+                c3 = clock();
                 // Generate image
                 nv_ext::Vec<grid_precision, grid_dimension_quadratic> minParamsVec(min_grid_point);
                 computeImageKernel<func_precision, grid_precision, grid_dimension_quadratic, __nTp><<<1, sar_image_params.N_x_pix>>>(minParamsVec,
@@ -1327,7 +1328,14 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
                     std::cout << "Good image found at index " << min_value_index1d << "." << std::endl;
                     break;
                 }
+                c4 = clock();
+                searchTime = (float) (c4 - c3) * 1000 / CLOCKS_PER_SEC;
+                printf("INFO: Focusing and Inference took %f ms.\n", searchTime);
             }
+            c2 = clock();
+            searchTime = (float) (c2 - c1) * 1000 / CLOCKS_PER_SEC;
+            totalTime += searchTime;
+            printf("INFO: DL Loop took %f ms.\n", searchTime);
             Status close_session = session->Close();
             if (!close_session.ok()) {
                 LOG(ERROR) << "Closing session failed: " << close_session;
@@ -1480,6 +1488,13 @@ void grid_cuda_focus_SAR_image(const SAR_Aperture<__nTp> &sar_data,
         output_image[idx]._M_imag = image_data[idx].y;
     }
 
+    std::ofstream myfile2;
+    myfile2.open("outputImage.csv", std::ios::out);
+    myfile2 << sar_image_params.N_x_pix << "," << sar_image_params.N_y_pix << "," << std::endl;
+    for (int idx = 0; idx < sar_image_params.N_x_pix * sar_image_params.N_y_pix; idx++) {
+        myfile2 << image_data[idx].x << "," << image_data[idx].y << "," << std::endl;
+    }
+    myfile2.close();
     // std::string tempStr("_beforeAF.bmp");
     // std::string beforeAF = output_filename + tempStr;
     // writeBMPFile(sar_image_params, output_image, beforeAF); // NOTE: Debugging only
@@ -1709,6 +1724,9 @@ int main(int argc, char **argv) {
     // default view is 100% of the maximum possible view
     SAR_image_params.Wx_m = 1.00 * SAR_image_params.max_Wx_m;
     SAR_image_params.Wy_m = 1.00 * SAR_image_params.max_Wy_m;
+
+    std::cout << "Wx_m = " << SAR_image_params.Wx_m << std::endl;
+    std::cout << "Wy_m = " << SAR_image_params.Wy_m << std::endl;
     // make reconstructed image equal size in (x,y) dimensions
     SAR_image_params.N_x_pix = (int) ((float) SAR_image_params.Wx_m * SAR_image_params.N_y_pix) / SAR_image_params.Wy_m;
     // Determine the resolution of the image (m)
